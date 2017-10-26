@@ -342,6 +342,8 @@ void Match::update(uint8_t *data){
         //Tally Scoreline
         if(event.type == goal)
             (event.isHome ? homeScore : awayScore) += 1;
+        else if(event.type == ownGoal)
+            (event.isHome ? awayScore : homeScore) += 1;
 
         //recalculate event time based on (hopefully) more accurate parameters
         recalcTime(event.gameTick, event.gameMinute, event.injuryMinute);
