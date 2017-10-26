@@ -21,21 +21,25 @@ public:
     }
 
     void sendEvent(QJsonDocument event){
-        socket->write(event.toJson());
+        if(valid())
+            socket->write(event.toJson());
     }
 
     bool valid() const{ return socket != nullptr; }
 
 public slots:
     void disconnected(){
-        socket->deleteLater();
+        if(valid())
+            socket->deleteLater();
         socket = nullptr;
     }
     void error(QLocalSocket::LocalSocketError){
-        socket->disconnectFromServer();
+        if(valid())
+            socket->disconnectFromServer();
     }
     void readyRead(){
-        socket->readAll();
+        if(valid())
+            socket->readAll();
     }
 
 private:
