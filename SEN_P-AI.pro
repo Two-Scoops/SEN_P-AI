@@ -22,14 +22,7 @@ SOURCES +=\
     src/StatSelectionDialog.cpp \
     src/StatsInfo.cpp \
     src/StatTableReader.cpp \
-    src/WikiEditor.cpp \
-    build/release/moc_CustomTableStyle.cpp \
-    build/release/moc_MainWindow.cpp \
-    build/release/moc_Match.cpp \
-    build/release/moc_PipeServer.cpp \
-    build/release/moc_SettingsDialog.cpp \
-    build/release/moc_StatSelectionDialog.cpp \
-    build/release/moc_StatTableReader.cpp
+    src/WikiEditor.cpp
 
 HEADERS  += \
     src/Common.h \
@@ -43,11 +36,7 @@ HEADERS  += \
     src/StatTableReader.h \
     src/TeamDataTable.h \
     src/WikiEditor.h \
-    src/WikiFootballbox.h \
-    build/ui_MainWindow.h \
-    build/ui_Match.h \
-    build/ui_SettingsDialog.h \
-    build/ui_StatSelectionDialog.h
+    src/WikiFootballbox.h
 
 FORMS    += \
     ui/MainWindow.ui \

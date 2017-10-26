@@ -20,7 +20,7 @@ struct statChange {
 };
 
 enum eventType: unsigned char {
-    goal, assist, yellowCard, redCard, subOn, subOff, teamsChanged, statsFound, statsLost, clockStopped, clockStarted
+    goal, assist, ownGoal, yellowCard, redCard, subOn, subOff, teamsChanged, statsFound, statsLost, clockStopped, clockStarted
 };
 
 struct matchEvent {
@@ -52,6 +52,9 @@ struct matchEvent {
             result +=              "' GOAL: " + player1Name;
             if(player2Id > 0)
                 result += "\n         assist: " + player2Name;
+            break;
+        case ownGoal:
+            result +=              "' OWN GOAL: "+ player1Name;
             break;
         case yellowCard:
             result +=              "' YELLOW: " + player1Name;
@@ -97,6 +100,11 @@ struct matchEvent {
             res["scorer"] = player1;
             if(player2Id > 0)
                 res["assister"] = player2;
+            break;
+        case ownGoal:
+            res["event"] = "Own Goal";
+            res["team"] = isHome ? "Home" : "Away";
+            res["player"] = player1;
             break;
         case yellowCard:
             res["event"] = "Card";

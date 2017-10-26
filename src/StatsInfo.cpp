@@ -22,7 +22,7 @@ const size_t statsInfo::playerEntrySize = STAT_ENTRY_SIZE;
 PESstat stats_arr[STAT_COUNT] = {
     {  0, 0x0000, uint32,1,  L("Player ID"), DontCare},
     {  1, 0x0004, uint32,9,  L("Goals Scored"),      Important},
-    {  2, 0x0028, uint32,9,  L("?UNKNOWN 2"),        Unknown},
+    {  2, 0x0028, uint32,9,  L("Own Goals Scored"),  Unknown},
     {  3, 0x004C, uint32,9,  L("Free kicks scored"), Normal},
     {  4, 0x0070, uint32,9,  L("Penalties scored"),  Normal},
     {  5, 0x0094, uint32,9,  L("Assists"),           Normal},

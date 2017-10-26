@@ -174,6 +174,7 @@ void Match::update(uint8_t *data){
     #define PAIR(STR,FN) std::pair<QString,eventFN>(QStringLiteral(STR), FN )
         PAIR("Goals Scored",          eventLAMBDA(local,   ,p){ local.setPlayerEvent(p, true,goal);      }),
         PAIR("Assists",               eventLAMBDA(local,   ,p){ local.setPlayerEvent(p,false,goal);      }),
+        PAIR("Own Goals Scored",      eventLAMBDA(local,   ,p){ local.setPlayerEvent(p,true,ownGoal);    }),
         PAIR("Yellow Cards",          eventLAMBDA(local,   ,p){ local.setPlayerEvent(p,true,yellowCard); }),
         PAIR("Red Cards",             eventLAMBDA(local,   ,p){ local.setPlayerEvent(p,true,redCard);    }),
         PAIR("First Minute on Pitch", eventLAMBDA(local,   ,p){ local.setPlayerEvent(p,true,subOn);      }),
