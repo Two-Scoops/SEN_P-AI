@@ -21,8 +21,17 @@ public:
     }
 
     void sendEvent(QJsonDocument event){
+        QByteArray data = event.toJson();
+        quint32 size = data.size();
+        const unsigned char sizeArr[] = {
+            (size>> 0) & 255,
+            (size>> 8) & 255,
+            (size>>16) & 255,
+            (size>>24) & 255
+        };
+        data.prepend((const char*)sizeArr,4);
         if(valid())
-            socket->write(event.toJson());
+            socket->write(data);
     }
 
     bool valid() const{ return socket != nullptr; }
