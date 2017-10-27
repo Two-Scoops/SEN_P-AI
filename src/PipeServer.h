@@ -35,16 +35,25 @@ public:
     }
 
     bool valid() const{ return socket != nullptr; }
+    quintptr descriptor() const{
+        if(valid())
+            return socket->socketDescriptor();
+        else
+            return -1;
+    }
 
 public slots:
     void disconnected(){
-        if(valid())
-            socket->deleteLater();
+        if(socket != nullptr){
+            socket->abort();
+        }
         socket = nullptr;
     }
     void error(QLocalSocket::LocalSocketError){
-        if(valid())
-            socket->disconnectFromServer();
+        if(socket != nullptr){
+            socket->abort();
+        }
+        socket = nullptr;
     }
     void readyRead(){
         if(valid())

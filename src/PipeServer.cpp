@@ -7,6 +7,7 @@ PipeServer::PipeServer(QObject *parent) : QObject(parent)
 {
     server = new QLocalServer(this);
     connect(server,&QLocalServer::newConnection, this,&PipeServer::newConnection);
+    server->setSocketOptions(QLocalServer::WorldAccessOption);
     server->listen("\\\\.\\pipe\\SEN_P-AI");
     if(!server->errorString().isEmpty())
         qDebug() << server->errorString();
@@ -97,8 +98,13 @@ void PipeServer::broadcastEvent(QJsonDocument event){
     log.open(QIODevice::ReadWrite | QIODevice::Text | QIODevice::Append);
     log.write(event.toJson());
     log.close();
-    std::remove_if(clients.begin(),clients.end(),[](PipeClient *client){ return !client->valid(); });
-    for(PipeClient *client: clients){
-        client->sendEvent(event);
+    auto i = clients.begin();
+    for(; i != clients.end(); ++i){
+        if((*i)->valid())
+            (*i)->sendEvent(event);
+        else{
+            (*i)->deleteLater();
+            clients.erase(i);
+        }
     }
 }

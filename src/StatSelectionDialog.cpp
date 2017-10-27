@@ -1,5 +1,5 @@
 #include "StatSelectionDialog.h"
-#include "ui_statselectiondialog.h"
+#include "ui_StatSelectionDialog.h"
 #include <QSettings>
 #include <QBitArray>
 
