@@ -22,7 +22,10 @@ SOURCES +=\
     src/StatSelectionDialog.cpp \
     src/StatsInfo.cpp \
     src/StatTableReader.cpp \
-    src/WikiEditor.cpp
+    src/WikiEditor.cpp \
+    lib/QR-Code-generator/QrSegment.cpp \
+    lib/QR-Code-generator/QrCode.cpp \
+    lib/QR-Code-generator/BitBuffer.cpp
 
 HEADERS  += \
     src/Common.h \
@@ -36,7 +39,10 @@ HEADERS  += \
     src/StatTableReader.h \
     src/TeamDataTable.h \
     src/WikiEditor.h \
-    src/WikiFootballbox.h
+    src/WikiFootballbox.h \
+    lib/QR-Code-generator/QrSegment.hpp \
+    lib/QR-Code-generator/QrCode.hpp \
+    lib/QR-Code-generator/BitBuffer.hpp
 
 FORMS    += \
     ui/MainWindow.ui \
@@ -57,4 +63,5 @@ DISTFILES += \
     resources/resource.rc \
     LICENSE.txt \
     README.md \
-    .gitignore
+    .gitignore \
+    lib/QR-Code-generator/Readme.markdown
