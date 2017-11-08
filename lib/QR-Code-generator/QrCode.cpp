@@ -105,8 +105,8 @@ QrCode QrCode::encodeSegments(const vector<QrSegment> &segs, Ecc ecl,
 	}
 	
 	// Add terminator and pad up to a byte if applicable
-	bb.appendBits(0, std::min<size_t>(4, dataCapacityBits - bb.size()));
-	bb.appendBits(0, (8 - bb.size() % 8) % 8);
+    bb.appendBits(0, (int)std::min<size_t>(4, dataCapacityBits - bb.size()));
+    bb.appendBits(0, (int)(8 - bb.size() % 8) % 8);
 	
 	// Pad with alternate bytes until data capacity is reached
 	for (uint8_t padByte = 0xEC; bb.size() < dataCapacityBits; padByte ^= 0xEC ^ 0x11)
@@ -206,7 +206,7 @@ void QrCode::drawFunctionPatterns() {
 	
 	// Draw numerous alignment patterns
 	const vector<int> alignPatPos(getAlignmentPatternPositions(version));
-	int numAlign = alignPatPos.size();
+    int numAlign = (int)alignPatPos.size();
 	for (int i = 0; i < numAlign; i++) {
 		for (int j = 0; j < numAlign; j++) {
 			if ((i == 0 && j == 0) || (i == 0 && j == numAlign - 1) || (i == numAlign - 1 && j == 0))
@@ -320,7 +320,7 @@ vector<uint8_t> QrCode::appendErrorCorrection(const vector<uint8_t> &data) const
 	const ReedSolomonGenerator rs(blockEccLen);
 	for (int i = 0, k = 0; i < numBlocks; i++) {
 		vector<uint8_t> dat(data.cbegin() + k, data.cbegin() + (k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1)));
-		k += dat.size();
+        k += (int)dat.size();
 		const vector<uint8_t> ecc(rs.getRemainder(dat));
 		if (i < numShortBlocks)
 			dat.push_back(0);

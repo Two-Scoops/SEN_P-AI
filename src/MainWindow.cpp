@@ -3,6 +3,7 @@
 #include <QScrollBar>
 #include <QHeaderView>
 #include <algorithm>
+#include "QrTimestamp.h"
 //#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -25,8 +26,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
     QTimer *timer = new QTimer(this);
+    QrTimestamp *qrcode = new QrTimestamp(ui->qrCode,this);
+    connect(timer,&QTimer::timeout, qrcode,&QrTimestamp::update);
     connect(timer,&QTimer::timeout, this,&MainWindow::showTime);
-    timer->start(100);
+    timer->start(33);
 
 
     reader = new StatTableReader(L"PES2017.exe",this);

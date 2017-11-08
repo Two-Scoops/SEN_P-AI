@@ -93,6 +93,20 @@ QrSegment QrSegment::makeNumeric(const char *digits) {
 	return QrSegment(Mode::NUMERIC, charCount, std::move(bb));
 }
 
+QrSegment QrSegment::makeNumeric(uint64_t val) {
+    BitBuffer bb;
+    bb.reserve(67);
+    int charCount = 0;
+    for(; val > 999; charCount += 3, val /= 1000){
+        bb.appendBits(uint32_t(val%1000),10);
+    }
+    if(val > 0){
+        bb.appendBits((uint32_t)val, (val > 9)? 7 : 4);
+        charCount += (val > 9)? 2 : 1;
+    }
+    return QrSegment(Mode::NUMERIC, charCount, std::move(bb));
+}
+
 
 QrSegment QrSegment::makeAlphanumeric(const char *text) {
 	BitBuffer bb;
@@ -103,7 +117,7 @@ QrSegment QrSegment::makeAlphanumeric(const char *text) {
 		const char *temp = std::strchr(ALPHANUMERIC_CHARSET, *text);
 		if (temp == nullptr)
 			throw "String contains unencodable characters in alphanumeric mode";
-		accumData = accumData * 45 + (temp - ALPHANUMERIC_CHARSET);
+        accumData = accumData * 45 + int(temp - ALPHANUMERIC_CHARSET);
 		accumCount++;
 		if (accumCount == 2) {
 			bb.appendBits(accumData, 11);

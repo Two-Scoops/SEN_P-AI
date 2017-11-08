@@ -96,6 +96,11 @@ class QrSegment final {
 	 * Returns a segment representing the given string of decimal digits encoded in numeric mode.
 	 */
 	public: static QrSegment makeNumeric(const char *digits);
+
+    /*
+     * Returns a segment representing the given unsigned integer encoded in numeric mode.
+     */
+    public: static QrSegment makeNumeric(uint64_t val);
 	
 	
 	/* 

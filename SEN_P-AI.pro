@@ -25,7 +25,8 @@ SOURCES +=\
     src/WikiEditor.cpp \
     lib/QR-Code-generator/QrSegment.cpp \
     lib/QR-Code-generator/QrCode.cpp \
-    lib/QR-Code-generator/BitBuffer.cpp
+    lib/QR-Code-generator/BitBuffer.cpp \
+    src/QrTimestamp.cpp
 
 HEADERS  += \
     src/Common.h \
@@ -42,7 +43,8 @@ HEADERS  += \
     src/WikiFootballbox.h \
     lib/QR-Code-generator/QrSegment.hpp \
     lib/QR-Code-generator/QrCode.hpp \
-    lib/QR-Code-generator/BitBuffer.hpp
+    lib/QR-Code-generator/BitBuffer.hpp \
+    src/QrTimestamp.h
 
 FORMS    += \
     ui/MainWindow.ui \
