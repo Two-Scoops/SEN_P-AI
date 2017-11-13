@@ -227,7 +227,6 @@ void Match::update(uint8_t *currData, uint8_t *prevData){
     }
 
     //=====================Process Stat Events=====================//
-    bool hasSubbed = false;
     //Search through the changed stats to record important events
     QVector<match_event> eventsThisUpdate;
     for(stat_change change: changes){
@@ -235,7 +234,6 @@ void Match::update(uint8_t *currData, uint8_t *prevData){
             continue;
         }
         const pEvent t = statEvents.value(change.statId);
-        hasSubbed = hasSubbed || t.type == subOn;
 
         match_event newEvent{when, -1, -1, t.type, change.player < home.nPlayers};
         match_event *event = &newEvent;
@@ -249,20 +247,17 @@ void Match::update(uint8_t *currData, uint8_t *prevData){
     }
 
     //===================Calculate update time=================//
-    for(int p = 0; p < totalPlayers; ++p){
-        when->gameMinute = std::max(when->gameMinute,(float)latestStats[vectorPosition(p, lmin_s)]);
-        when->gameTick   = std::max(when->gameTick,(int32_t)latestStats[vectorPosition(p,ticks_s)]);
+    {
+        //Calculate the mean average of the "Last Minute on Pitch" stat to eliminate inaccuracies caused by subbing (thanks PES)
+        QMap<int,int> minuteCount;
+        for(int p = 0; p < totalPlayers; ++p){
+            minuteCount[(int)latestStats[vectorPosition(p, lmin_s)]]++;
+            when->gameTick   = std::max(when->gameTick,(int32_t)latestStats[vectorPosition(p,ticks_s)]);
+        }
+        minuteCount[-1] = -1;
+        QMap<int,int>::iterator mean = std::max_element(minuteCount.begin(),minuteCount.end());
+        when->gameMinute = (float)mean.key();
     }
-    //fix inaccurate times caused by subbing
-    if(hasSubbed){
-        minuteSubbed = (int)when->gameMinute;
-        when->gameMinute -= 1;
-    }
-    //===================TODO=================//
-    //TODO figure out what to do when gameMinute == minuteSubbed
-    //Issues:
-    //what happens when subbed in injury time?
-    //what happens if the minute is incorrectly advanced to 45/90/105/120?
 
     //Calculate the current state of the match clock
     int gameMinute = (int)when->gameMinute, gameTick = when->gameTick;

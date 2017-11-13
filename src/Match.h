@@ -124,7 +124,6 @@ private:
     int tickLastUpdate = 0;
     int tickLastStopped = 0;
     int lastMinute = 0;
-    int minuteSubbed = -1;
     int minuteTicks[121] = {-1};
     static int matchLength; //In (realtime) minutes (as specified in the match settings)
 
