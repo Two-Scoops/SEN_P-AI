@@ -27,7 +27,7 @@ void PipeServer::newConnection(){
         qDebug() << server->errorString();
 }
 //TODO handle connections and incoming messages
-void PipeServer::newEvent(matchEvent event, const QList<matchEvent> &){
+void PipeServer::newEvent(match_event event, const QVector<match_event> &){
     broadcastEvent(event.toJSON());
 }
 

@@ -138,10 +138,11 @@ void StatTableReader::update(){
 
                 if(basePtr){ //Stat Table is found
                     emit status_changed(QStringLiteral("Updating stats"),0);
-                    int homeRead = ReadProcessMemory(proccessHandle, homePtr, data,                        _nHome*STAT_ENTRY_SIZE, NULL);
-                    int awayRead = ReadProcessMemory(proccessHandle, awayPtr, data+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+                    int homeRead = ReadProcessMemory(proccessHandle, homePtr, prevData,                        _nHome*STAT_ENTRY_SIZE, NULL);
+                    int awayRead = ReadProcessMemory(proccessHandle, awayPtr, prevData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
                     if(homeRead && awayRead){ //Table read succeeds
-                        emit statTableUpdate(data);
+                        std::swap(currData,prevData);
+                        emit statTableUpdate(currData,prevData);
                     } else { //Table read fails
                         basePtr = homePtr = awayPtr = nullptr;
                         emit status_changed(QStringLiteral("Stats table lost"),0);
@@ -169,17 +170,18 @@ void StatTableReader::update(){
                                 awayPtr = (uint8_t*)(mappingAddr+AWAY_OFFSET);
                                 //If the number of valid players on each team is different than it was before, reallocate the player entries array and fix all the pointers
                                 if(homeCount != _nHome || awayCount != _nAway){
-                                    data = (uint8_t*)realloc(data,(homeCount+awayCount)*STAT_ENTRY_SIZE);
+                                    currData = data = (uint8_t*)realloc(data,(homeCount+awayCount)*STAT_ENTRY_SIZE*2);
+                                    prevData = currData + ((homeCount+awayCount)*STAT_ENTRY_SIZE);
                                     //fix all the pointers and counts
                                     _nHome = homeCount;
                                     _nAway = awayCount;
                                     _nPlayers = homeCount + awayCount;
                                 }
                                 //Do an initial update of the stats table
-                                ReadProcessMemory(proccessHandle, homePtr, data,                        _nHome*STAT_ENTRY_SIZE, NULL);
-                                ReadProcessMemory(proccessHandle, awayPtr, data+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+                                ReadProcessMemory(proccessHandle, homePtr, currData,                        _nHome*STAT_ENTRY_SIZE, NULL);
+                                ReadProcessMemory(proccessHandle, awayPtr, currData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
                                 emit status_changed(QStringLiteral("Stats table found"),0);
-                                emit table_found(data);
+                                emit table_found(currData);
                                 break;
                             }//End If enough valid players
                         }//End If matching memory block

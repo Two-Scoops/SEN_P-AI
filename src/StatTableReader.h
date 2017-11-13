@@ -28,7 +28,7 @@ class StatTableReader: public QObject
 public:
     StatTableReader(const wchar_t *name, QObject *parent = 0): QObject(parent),
         _nHome(0), _nAway(0), _nPlayers(0), _homeID(0), _awayID(0),
-        data(nullptr),
+        data(nullptr), currData(nullptr), prevData(nullptr),
         basePtr(nullptr), homePtr(nullptr), awayPtr(nullptr),
         proccessName(name), proccessHandle(nullptr),
         teamDataPtr(nullptr), currTeamData(&(teamData[0])), prevTeamData(&(teamData[1])){}
@@ -52,7 +52,7 @@ public slots:
     void update();
 signals:
     void status_changed(QString str, int timeout);
-    void statTableUpdate(uint8_t *data);
+    void statTableUpdate(uint8_t *curr, uint8_t *prev);
     void table_lost();
     void table_found(uint8_t *data);
     void teamData_lost();
@@ -62,7 +62,7 @@ signals:
 private:
     int _nHome, _nAway, _nPlayers;
     uint32_t _homeID, _awayID;
-    uint8_t *data;
+    uint8_t *data, *currData, *prevData;
 
 
     void *basePtr, *homePtr, *awayPtr;

@@ -9,6 +9,17 @@ enum type:char {
     sint8, uint8, uint16, uint32, float32, uint32x9, uint32arr, validIndicator, cstring
 };
 
+union stat_value {
+    float f;
+    int32_t i;
+    uint32_t u;
+
+    stat_value(float F): f(F){}
+    stat_value(int32_t I): i(I){}
+    stat_value(uint32_t U): u(U){}
+    stat_value(): u(0){}
+};
+
 struct PESstat {
     int visualIndex;
     ptrdiff_t offset;
@@ -23,7 +34,7 @@ struct PESstat {
 //        name(_name), comment(_comment), offset(_offset), visualIndex(idx), statType(_type), count(_count), shown(_shown), logged(_logged) {
 //    }
 
-    double getSegmentValue(uint8_t *data, uint8_t segment = 0) const{
+    double getSegmentDouble(uint8_t *data, uint8_t segment = 0) const{
         if(segment >= count) return std::nan("");
         switch (statType) {
 #define CASE(VAL,TYPE) case VAL: return *(TYPE*)(data + offset + segment * sizeof(TYPE))
@@ -32,14 +43,28 @@ struct PESstat {
         CASE( uint16,uint16_t);
         CASE( uint32,uint32_t);
         CASE(float32,float);
+#undef CASE
         default: return std::nan("");
+        }
+    }
+
+    stat_value getSegmentValue(uint8_t *data, uint8_t segment = 0) const{
+        if(segment >= count) return stat_value{std::nanf("")};
+        switch (statType) {
+#define CASE(VAL,TYPE) case VAL: return stat_value{*(TYPE*)(data + offset + segment * sizeof(TYPE))}
+        CASE( sint8,  int8_t);
+        CASE( uint8, uint8_t);
+        CASE( uint16,uint16_t);
+        CASE( uint32,uint32_t);
+        CASE(float32,float);
+        default: return stat_value{std::nanf("")};
         }
     }
 
     double getValue(uint8_t *data) const{
         double result = 0;
         for(uint8_t i = 0; i < count; ++i)
-            result += getSegmentValue(data,i);
+            result += getSegmentDouble(data,i);
         return result;
     }
 
@@ -47,8 +72,11 @@ struct PESstat {
         return getValue(curr) != getValue(prev);
     }
 
-    bool getSegmentChanged(uint8_t *curr, uint8_t *prev, uint8_t segment) const{
-        return getSegmentValue(curr,segment) != getSegmentValue(prev,segment);
+    bool getSegmentChanged(uint8_t *curr, uint8_t *prev, uint8_t segment, stat_value *out = nullptr) const{
+        bool res = getSegmentDouble(curr,segment) != getSegmentDouble(prev,segment);
+        if(res && out != nullptr)
+            *out = getSegmentValue(curr,segment);
+        return res;
     }
 };
 
@@ -68,6 +96,14 @@ public:
         for(int s = 0; s < statCount; ++s){
             statMapping.insert(stats[s].name,stats+s);
         }
+    }
+
+    static int getStatIndex(QString str){
+        for(int i = 0; i < statCount; ++i){
+            if(stats[i].name == str)
+                return i;
+        }
+        return -1;
     }
 
     static PESstat& getStat(size_t i){

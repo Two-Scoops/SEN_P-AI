@@ -74,7 +74,7 @@ signals:
 
 public slots:
     void newConnection();
-    void newEvent(matchEvent event, const QList<matchEvent> &);
+    void newEvent(match_event event, const QVector<match_event> &);
 
     void table_lost(qint64 timestamp, float gameMinute, float injuryMinute);
     void table_found(qint64 timestamp, float gameMinute, float injuryMinute, int homeScore, int awayScore);
