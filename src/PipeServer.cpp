@@ -28,73 +28,73 @@ void PipeServer::newConnection(){
 }
 //TODO handle connections and incoming messages
 void PipeServer::newEvent(match_event event, const QVector<match_event> &){
-    broadcastEvent(event.toJSON());
+    broadcastEvent(event.toJSON(),event.when->match);
 }
 
 
-void PipeServer::table_lost(qint64 timestamp, float gameMinute, float injuryMinute){
+void PipeServer::table_lost(match_time *when){
     areStatsFound = false;
     QJsonObject event{
         {"type","Event"},
         {"event","Stats Lost"},
-        {"timestamp",timestamp},
-        {"gameMinute",gameMinute},
-        {"injuryMinute",std::isnan(injuryMinute) ? QJsonValue(true) : QJsonValue(injuryMinute)}
+        {"timestamp",when->timestamp},
+        {"gameMinute",when->gameMinute},
+        {"injuryMinute",std::isnan(when->injuryMinute) ? QJsonValue(true) : QJsonValue(when->injuryMinute)}
     };
-    if(injuryMinute < 0)
+    if(when->injuryMinute < 0)
         event.remove("injuryMinute");
-    broadcastEvent(QJsonDocument(event));
+    broadcastEvent(QJsonDocument(event),when->match);
 }
 
-void PipeServer::table_found(qint64 timestamp, float gameMinute, float injuryMinute, int homeScore, int awayScore){
+void PipeServer::table_found(match_time *when){
     areStatsFound = true;
     QJsonObject event{
         {"type","Event"},
         {"event","Stats Found"},
-        {"timestamp",timestamp},
-        {"gameMinute",gameMinute},
-        {"injuryMinute",std::isnan(injuryMinute) ? QJsonValue(true) : QJsonValue(injuryMinute)},
-        {"homeScore",homeScore},
-        {"awayScore",awayScore}
+        {"timestamp",when->timestamp},
+        {"gameMinute",when->gameMinute},
+        {"injuryMinute",std::isnan(when->injuryMinute) ? QJsonValue(true) : QJsonValue(when->injuryMinute)},
+        {"homeScore",when->match->homeScore},
+        {"awayScore",when->match->awayScore}
     };
-    if(injuryMinute < 0)
+    if(when->injuryMinute < 0)
         event.remove("injuryMinute");
     lastStatsFound = QJsonDocument(event);
-    broadcastEvent(lastStatsFound);
+    broadcastEvent(lastStatsFound, when->match);
 }
 
-void PipeServer::teamsChanged(qint64 timestamp, teamInfo home, teamInfo away){
+void PipeServer::teamsChanged(Match *match){
     QJsonArray homeArr, awayArr;
-    for(int i = 0; i < home.nPlayers; ++i)
-        homeArr.append(QJsonObject{ {"name",home.player[i].name}, {"playerId",(qint64)home.player[i].ID} });
-    for(int i = 0; i < away.nPlayers; ++i)
-        awayArr.append(QJsonObject{ {"name",away.player[i].name}, {"playerId",(qint64)away.player[i].ID} });
+    for(int i = 0; i < match->home.nPlayers; ++i)
+        homeArr.append(QJsonObject{ {"name",match->home.player[i].name}, {"playerId",(qint64)match->home.player[i].ID} });
+    for(int i = 0; i < match->away.nPlayers; ++i)
+        awayArr.append(QJsonObject{ {"name",match->away.player[i].name}, {"playerId",(qint64)match->away.player[i].ID} });
 
     QJsonObject event{
         {"type","Event"},
         {"event","Teams Changed"},
-        {"timestamp",timestamp},
+        {"timestamp",match->timestamp()},
         {"home",
             QJsonObject {
-                {"name",home.name},
-                {"id",(qint64)home.ID},
+                {"name",match->home.name},
+                {"id",(qint64)match->home.ID},
                 {"players",homeArr}
             }
         },
         {"away",
             QJsonObject{
-                {"name",away.name},
-                {"id",(qint64)away.ID},
+                {"name",match->away.name},
+                {"id",(qint64)match->away.ID},
                 {"players",awayArr}
             }
         }
     };
     lastTeamsChanged = QJsonDocument(event);
-    broadcastEvent(lastTeamsChanged);
+    broadcastEvent(lastTeamsChanged, match);
 }
 
-void PipeServer::broadcastEvent(QJsonDocument event){
-    QFile log(applyFilenameFormat(QSettings().value("EventLogFile", "SEN_P-AI_Events.log").toString()));
+void PipeServer::broadcastEvent(QJsonDocument event, Match *match, qint64 timestamp){
+    QFile log(match->applyFilenameFormat(QSettings().value("EventLogFile", "SEN_P-AI_Events.log").toString(),timestamp));
     log.open(QIODevice::ReadWrite | QIODevice::Text | QIODevice::Append);
     log.write(event.toJson());
     log.close();

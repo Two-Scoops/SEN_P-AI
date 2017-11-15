@@ -34,16 +34,17 @@ signals:
     void statsDisplayChanged(statsInfo &info);
 
 private:
-    Ui::MainWindow *ui;
-    QDateTime *clock;
+    Ui::MainWindow *ui = nullptr;
+    QDateTime *clock = nullptr;
     statsInfo info;
-    StatTableReader *reader;
-    QTimer *updateTimer;
-    statSelectionDialog *statsSelect;
-    SettingsDialog *settingsDialog;
-    PipeServer *server;
+    StatTableReader *reader = nullptr;
+    QTimer *updateTimer = nullptr;
+    statSelectionDialog *statsSelect = nullptr;
+    SettingsDialog *settingsDialog = nullptr;
+    PipeServer *server = nullptr;
 
-    Match *currentMatch;
+    Match *currMatch = nullptr;
+    teamInfo currHome, currAway;
 };
 
 

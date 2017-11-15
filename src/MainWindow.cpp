@@ -34,7 +34,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     reader = new StatTableReader(L"PES2017.exe",this);
     server = new PipeServer(this);
-    connect(reader,&StatTableReader::teamsChanged, server,&PipeServer::teamsChanged);
 
     updateTimer = new QTimer(this);
     connect(updateTimer,&QTimer::timeout,               reader,&StatTableReader::update);
@@ -51,52 +50,54 @@ void MainWindow::showTime(){
 }
 
 void MainWindow::table_lost(){
-    if(currentMatch == nullptr)
+    if(currMatch == nullptr)
         return;
-    currentMatch->endMatch();
-    disconnect(currentMatch, 0,0,0);
-    disconnect(reader, 0, currentMatch, 0);
-    disconnect(updateTimer, 0, currentMatch, 0);
+    currMatch->endMatch();
+    disconnect(currMatch, 0,0,0);
+    disconnect(reader, 0, currMatch, 0);
+    disconnect(updateTimer, 0, currMatch, 0);
 
-    currentMatch = nullptr;
+    currMatch = nullptr;
 }
 
 void MainWindow::teams_changed(qint64, teamInfo home, teamInfo away){
-    if(currentMatch != nullptr){
-        ui->matchTabs->removeTab(ui->matchTabs->indexOf(currentMatch));
+    if(currMatch != nullptr){
+        ui->matchTabs->removeTab(ui->matchTabs->indexOf(currMatch));
     }
     if(home.name[0] == '\0' || away.name[0] == '\0'){
-        currentMatch = nullptr;
+        currMatch = nullptr;
         return;
     }
-    currentMatch = new Match(reader,home,away,this);
-    connect(this, &MainWindow::statsDisplayChanged, currentMatch, &Match::statsDisplayChanged);
-    connect(currentMatch,&Match::table_found, server,&PipeServer::table_found);
-    connect(currentMatch,&Match::table_lost, server,&PipeServer::table_lost);
-    connect(currentMatch,&Match::newEvent, server,&PipeServer::newEvent);
+    currHome = home; currAway = away;
+    currMatch = new Match(reader,home,away,this);
+    connect(this, &MainWindow::statsDisplayChanged, currMatch, &Match::statsDisplayChanged);
+    connect(currMatch,&Match::table_found, server,&PipeServer::table_found);
+    connect(currMatch,&Match::table_lost, server,&PipeServer::table_lost);
+    connect(currMatch,&Match::newEvent, server,&PipeServer::newEvent);
 
     int currentTab = ui->matchTabs->currentIndex();
-    ui->matchTabs->insertTab(0,currentMatch,QStringLiteral("%1 vs %2").arg(home.name).arg(away.name));
+    ui->matchTabs->insertTab(0,currMatch,QStringLiteral("%1 vs %2").arg(home.name).arg(away.name));
     if(currentTab == 0)
         ui->matchTabs->setCurrentIndex(0);
+    server->teamsChanged(currMatch);
     emit statsDisplayChanged(info);
 }
 
 void MainWindow::table_found(uint8_t *data){
-    if(!currentMatch){
-        currentMatch = new Match(reader,currHome,currAway,this);
-        connect(this, &MainWindow::statsDisplayChanged, currentMatch, &Match::statsDisplayChanged);
+    if(!currMatch){
+        currMatch = new Match(reader,currHome,currAway,this);
+        connect(this, &MainWindow::statsDisplayChanged, currMatch, &Match::statsDisplayChanged);
 
         int currentTab = ui->matchTabs->currentIndex();
-        ui->matchTabs->insertTab(0,currentMatch,QStringLiteral("%1 vs %2").arg(currHome.name).arg(currAway.name));
+        ui->matchTabs->insertTab(0,currMatch,QStringLiteral("%1 vs %2").arg(currHome.name).arg(currAway.name));
         if(currentTab == 0)
             ui->matchTabs->setCurrentIndex(0);
         emit statsDisplayChanged(info);
     }
-    currentMatch->stats_found(data);
-    currentMatch->showBenched(ui->showBenched->isChecked());
-    connect(ui->showBenched,&QCheckBox::toggled, currentMatch, &Match::showBenched);
-    connect(reader,&StatTableReader::statTableUpdate, currentMatch, &Match::update);
+    currMatch->stats_found(data);
+    currMatch->showBenched(ui->showBenched->isChecked());
+    connect(ui->showBenched,&QCheckBox::toggled, currMatch, &Match::showBenched);
+    connect(reader,&StatTableReader::statTableUpdate, currMatch, &Match::update);
 }
 
 MainWindow::~MainWindow()

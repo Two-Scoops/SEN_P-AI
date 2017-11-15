@@ -8,6 +8,7 @@
 #include <QString>
 #include <QJsonDocument>
 #include "Common.h"
+#include "Match.h"
 
 class PipeClient : public QObject{
     Q_OBJECT
@@ -76,9 +77,9 @@ public slots:
     void newConnection();
     void newEvent(match_event event, const QVector<match_event> &);
 
-    void table_lost(qint64 timestamp, float gameMinute, float injuryMinute);
-    void table_found(qint64 timestamp, float gameMinute, float injuryMinute, int homeScore, int awayScore);
-    void teamsChanged(qint64 timestamp, teamInfo home, teamInfo away);
+    void table_lost(match_time *when);
+    void table_found(match_time *when);
+    void teamsChanged(Match *match);
 
 private:
     QJsonDocument lastTeamsChanged;
@@ -89,7 +90,9 @@ private:
     QList<PipeClient*> clients;
     QLocalServer *server;
 
-    void broadcastEvent(QJsonDocument event);
+    void broadcastEvent(QJsonDocument event, Match *match, qint64 timestamp);
+    void broadcastEvent(QJsonDocument event, Match *match){ broadcastEvent(event,match,match->timestamp()); }
+    void broadcastEvent(QJsonDocument event, match_time *when){ broadcastEvent(event,when->match,when->timestamp); }
 };
 
 #endif // PIPESERVER_H

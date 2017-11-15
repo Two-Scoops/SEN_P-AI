@@ -22,6 +22,7 @@ Match::Match(StatTableReader *_reader, teamInfo homeInfo, teamInfo awayInfo, QWi
     home(homeInfo), away(awayInfo), totalPlayers(homeInfo.nPlayers + awayInfo.nPlayers), reader(_reader),
     ui(new Ui::Match)
 {
+    matchCreationTime = QDateTime::currentMSecsSinceEpoch();
     ui->setupUi(this);
     ui->homeLabel->setText(homeInfo.name);
     ui->awayLabel->setText(awayInfo.name);
@@ -149,7 +150,7 @@ void Match::stats_found(uint8_t *data){
             ui->eventLog->append(logStr);
     }
 
-    emit table_found(QDateTime::currentMSecsSinceEpoch(),lastMinute,-1,homeScore,awayScore);
+    emit table_found(when);
 }
 
 void Match::statsDisplayChanged(statsInfo &info){
@@ -410,12 +411,14 @@ void Match::setLabels(int gameMinute, double time, double injuryTime){
 
 
 void Match::endMatch(){
+    updateTimes.push_back(updateTimes.back());
+    updateTimes.back().timestamp = QDateTime::currentMSecsSinceEpoch();
     for(int row = 0; row < ui->statsTable->rowCount(); ++row){
         for(int col = 0; col < ui->statsTable->columnCount(); ++col){
             ui->statsTable->item(row,col)->setTextColor(Qt::black);
         }
     }
-    emit table_lost(QDateTime::currentMSecsSinceEpoch(),updateTimes.back().gameMinute,updateTimes.back().injuryMinute);
+    emit table_lost(&updateTimes.back());
 }
 
 

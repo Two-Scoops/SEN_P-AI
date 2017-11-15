@@ -11,6 +11,9 @@
 #include "StatSelectionDialog.h"
 #include "StatsInfo.h"
 #include <deque>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
 
 class Match;
 
@@ -77,16 +80,29 @@ public:
 
     const uint8_t totalPlayers;
     const teamInfo home, away;
+    int homeScore = 0, awayScore = 0;
 
 
-    QString getPlayerName(int player){
+    QString getPlayerName(int player) const{
         if(player < 0) return QString();
         return player > home.nPlayers ? away.player[player - home.nPlayers].name : home.player[player].name;
     }
 
-    quint32 getPlayerId(int player){
+    quint32 getPlayerId(int player) const{
         if(player < 0) return 0;
         return player > home.nPlayers ? away.player[player - home.nPlayers].ID : home.player[player].ID;
+    }
+
+    qint64 timestamp() const{ return matchCreationTime; }
+
+    QString applyFilenameFormat(QString qstr, qint64 timestamp){
+        QString homename = home.name, awayname = away.name;
+        qstr.replace("%HOME",homename.remove(QRegExp("[^\\w@]")));
+        qstr.replace("%AWAY",awayname.remove(QRegExp("[^\\w@]")));
+        std::wstringstream string;
+        std::time_t time = (std::time_t)(timestamp/1000);
+        string<< std::put_time(std::gmtime(&time), qstr.toStdWString().data());
+        return QString::fromStdWString(string.str());
     }
     //================Event handling==================//
 public slots:
@@ -102,8 +118,8 @@ signals:
     void newEvent(match_event event, const QVector<match_event> &previousEvents);
 
 
-    void table_lost(qint64 timestamp, float gameMinute, float injuryMinute);
-    void table_found(qint64 timestamp, float gameMinute, float injuryMinute, int homeScore, int awayScore);
+    void table_lost(match_time *when);
+    void table_found(match_time *when);
 
 protected:
     //to handle copying the table via CTRL+C
@@ -112,7 +128,6 @@ protected:
 private:
     Ui::Match *ui;
     StatTableReader *reader;
-    int homeScore = 0, awayScore = 0;
     static int darkenRate;
     static bool benchShown;
 
@@ -129,7 +144,7 @@ private:
 
 
     //================Record-keeping==================//
-    qint64 matchStartTime, matchEndTime;
+    qint64 matchCreationTime, matchStartTime, matchEndTime;
     //2D array, Column-major, 64 rows, StatTableReader::stat_count columns
     QVector<double> latestStats;
 

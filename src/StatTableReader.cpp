@@ -9,9 +9,6 @@
 #include <tlhelp32.h>
 #include <QDebug>
 
-
-teamInfo currHome, currAway;
-
 #define STAT_MEM_STATE MEM_COMMIT
 #define STAT_MEM_TYPE MEM_PRIVATE
 #define STAT_MEM_PROTEC PAGE_READWRITE
@@ -228,9 +225,6 @@ void StatTableReader::update(){
                                 away.player[away.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
                             }
                         }
-
-                        currHome = home;
-                        currAway = away;
                         emit status_changed(QStringLiteral("Team data found"),0);
                         emit teamsChanged(QDateTime::currentMSecsSinceEpoch(),home,away);
                         break;
