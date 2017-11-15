@@ -3,13 +3,14 @@
 
 #include <QWidget>
 #include <QList>
-#include <QVector>
 #include <QDateTime>
 #include <QJsonDocument>
 #include <QMap>
 #include "StatTableReader.h"
 #include "StatSelectionDialog.h"
 #include "StatsInfo.h"
+#include <unordered_map>
+#include <vector>
 #include <deque>
 #include <sstream>
 #include <iomanip>
@@ -115,7 +116,7 @@ public slots:
 signals:
     void clock_stopped(quint64 timestamp, quint32 gameTick, float gameMinute, float injuryMinute);
     void clock_started(quint64 timestamp, quint32 gameTick, float gameMinute, float injuryMinute);
-    void newEvent(match_event event, const QVector<match_event> &previousEvents);
+    void newEvent(match_event event, const std::vector<match_event> &previousEvents);
 
 
     void table_lost(match_time *when);
@@ -146,18 +147,18 @@ private:
     //================Record-keeping==================//
     qint64 matchCreationTime, matchStartTime, matchEndTime;
     //2D array, Column-major, 64 rows, StatTableReader::stat_count columns
-    QVector<double> latestStats;
+    std::vector<double> latestStats;
 
     //List of times when stats were updated, DO NOT INSERT OR ERASE except from front/back
     std::deque<match_time> updateTimes;
     //Important events in the match, each referencing an updateTimes entry
-    QVector<match_event> events;
+    std::vector<match_event> events;
     //All stat changes, separated by player and each referencing an updateTimes entry
-    QVector<stat_change> playerStatHistory[64];
+    std::vector<stat_change> playerStatHistory[64];
 
     static int goal_s, assist_s, owngoal_s, yellow_s, red_s, fmin_s, lmin_s, ticks_s;
     struct pEvent { bool is1; eventType type; };
-    static QHash<int,pEvent> statEvents;
+    static std::unordered_map<int,pEvent> statEvents;
 
 
     //================Utility==================//

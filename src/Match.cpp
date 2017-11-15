@@ -2,7 +2,6 @@
 #include "ui_match.h"
 #include "CustomTableStyle.h"
 #include <QScrollBar>
-#include <QHash>
 #include <utility>
 #include <cmath>
 int Match::matchLength = 10;
@@ -15,7 +14,7 @@ int Match::    red_s;
 int Match::   fmin_s;
 int Match::   lmin_s;
 int Match::  ticks_s;
-QHash<int,Match::pEvent> Match::statEvents;
+std::unordered_map<int,Match::pEvent> Match::statEvents;
 
 Match::Match(StatTableReader *_reader, teamInfo homeInfo, teamInfo awayInfo, QWidget *parent) :
     QWidget(parent),
@@ -29,8 +28,7 @@ Match::Match(StatTableReader *_reader, teamInfo homeInfo, teamInfo awayInfo, QWi
     ui->statsTable->setColumnCount((int)statsInfo::count());
     ui->statsTable->setRowCount(totalPlayers);
 
-    latestStats.resize(totalPlayers * (int)statsInfo::count());
-    latestStats.fill(0,totalPlayers * (int)statsInfo::count());
+    latestStats.resize(totalPlayers * (int)statsInfo::count(), 0);
 
     currentHalf = firstHalf;
     minuteTicks[0] = 0;
@@ -96,7 +94,7 @@ void Match::keyPressEvent(QKeyEvent *event){
 void Match::stats_found(uint8_t *data){
     matchStartTime = QDateTime::currentMSecsSinceEpoch();
     QFontMetrics fm(ui->statsTable->font());
-    QVector<int> maxWidths = QVector<int>((int)statsInfo::count(),0);
+    std::vector<int> maxWidths = std::vector<int>((int)statsInfo::count(),0);
 
     updateTimes.push_back(match_time{this,matchStartTime,-1.0f,-1.0f,0});
     match_time *when = &updateTimes.back();
@@ -118,18 +116,18 @@ void Match::stats_found(uint8_t *data){
         lastMinute = std::max(lastMinute,(int)statsInfo::getStat("Last Minute on Pitch").getValue(currPlayer));
         tickLastUpdate = std::max(tickLastUpdate,(int)statsInfo::getStat("Game Ticks Played").getValue(currPlayer));
         for(int i = statsInfo::getStat(goal_s).getValue(currPlayer); i > 0; --i){
-            events.append(match_event{when,p,-1,goal, p < home.nPlayers});
+            events.push_back(match_event{when,p,-1,goal, p < home.nPlayers});
             (p < home.nPlayers ? homeScore : awayScore) += 1;
         }
         for(int i = statsInfo::getStat(owngoal_s).getValue(currPlayer); i > 0; --i){
-            events.append(match_event{when,p,-1,ownGoal, p < home.nPlayers});
+            events.push_back(match_event{when,p,-1,ownGoal, p < home.nPlayers});
             (p < home.nPlayers ? awayScore : homeScore) += 1;
         }
         for(int i = statsInfo::getStat(yellow_s).getValue(currPlayer); i > 0; --i){
-            events.append(match_event{when,p,-1,yellowCard, p < home.nPlayers});
+            events.push_back(match_event{when,p,-1,yellowCard, p < home.nPlayers});
         }
         for(int i = statsInfo::getStat(red_s).getValue(currPlayer); i > 0; --i){
-            events.append(match_event{when,p,-1,redCard, p < home.nPlayers});
+            events.push_back(match_event{when,p,-1,redCard, p < home.nPlayers});
         }
     }
     when->gameMinute = lastMinute;
@@ -168,14 +166,14 @@ void Match::statsDisplayChanged(statsInfo &info){
 
 void Match::update(uint8_t *currData, uint8_t *prevData){
     QFontMetrics fm(ui->statsTable->font());
-    QVector<int> maxWidths = QVector<int>((int)statsInfo::count(),0);
+    std::vector<int> maxWidths = std::vector<int>((int)statsInfo::count(),0);
 
     //The current segment of the match, gets set when a segmented stat change is detected, otherwise we don't need it anyway
     int segment = -1;//1st half: [0-2], 2nd half: [3-5], 1st ET: [6-7?], 2nd ET: [7?-8?]  //TODO figure out if segment 8 is used
 
     updateTimes.push_back(match_time{this,QDateTime::currentMSecsSinceEpoch(),(float)lastMinute,-1.0f,tickLastUpdate});
     match_time *when = &updateTimes.back();
-    QVector<stat_change> changes;
+    std::vector<stat_change> changes;
 
     //==================Collect Stat Changes====================//
     //For every stat of every player
@@ -229,12 +227,13 @@ void Match::update(uint8_t *currData, uint8_t *prevData){
 
     //=====================Process Stat Events=====================//
     //Search through the changed stats to record important events
-    QVector<match_event> eventsThisUpdate;
+    std::vector<match_event> eventsThisUpdate;
     for(stat_change change: changes){
-        if(!statEvents.contains(change.statId)){
+        auto i = statEvents.find(change.statId);
+        if(i == statEvents.end()){
             continue;
         }
-        const pEvent t = statEvents.value(change.statId);
+        const pEvent t = i->second;
 
         match_event newEvent{when, -1, -1, t.type, change.player < home.nPlayers};
         match_event *event = &newEvent;
@@ -244,20 +243,20 @@ void Match::update(uint8_t *currData, uint8_t *prevData){
         }
         (t.is1 ? event->player1 : event->player2) = change.player;
         if(event == &newEvent)
-            eventsThisUpdate.append(newEvent);
+            eventsThisUpdate.push_back(newEvent);
     }
 
     //===================Calculate update time=================//
     {
         //Calculate the mean average of the "Last Minute on Pitch" stat to eliminate inaccuracies caused by subbing (thanks PES)
-        QMap<int,int> minuteCount;
+        std::unordered_map<int,int> minuteCount;
         for(int p = 0; p < totalPlayers; ++p){
             minuteCount[(int)latestStats[vectorPosition(p, lmin_s)]]++;
             when->gameTick   = std::max(when->gameTick,(int32_t)latestStats[vectorPosition(p,ticks_s)]);
         }
         minuteCount[-1] = -1;
-        QMap<int,int>::iterator mean = std::max_element(minuteCount.begin(),minuteCount.end());
-        when->gameMinute = (float)mean.key();
+        std::unordered_map<int,int>::iterator mean = std::max_element(minuteCount.begin(),minuteCount.end());
+        when->gameMinute = (float)mean->first;
     }
 
     //Calculate the current state of the match clock
@@ -368,23 +367,23 @@ void Match::update(uint8_t *currData, uint8_t *prevData){
     if(gameTick == tickLastUpdate){
         if(gameTick != tickLastStopped){
             tickLastStopped = gameTick;
-            eventsThisUpdate.append(match_event{when,-1,-1,clockStopped,false});
+            eventsThisUpdate.push_back(match_event{when,-1,-1,clockStopped,false});
             emit clock_stopped(when->timestamp,gameTick,time,injuryTime);
         }
     } else {
         if(tickLastUpdate == tickLastStopped){
-            eventsThisUpdate.append(match_event{when,-1,-1,clockStopped,false});
+            eventsThisUpdate.push_back(match_event{when,-1,-1,clockStopped,false});
             emit clock_started(when->timestamp,gameTick,time,injuryTime);
         }
         tickLastUpdate = gameTick;
     }
 
     //Add new events and stat changes to the match or if there were none, remove the latest update time
-    if(eventsThisUpdate.isEmpty() && changes.isEmpty()){
+    if(eventsThisUpdate.empty() && changes.empty()){
         when = nullptr;
         updateTimes.pop_back();
     } else {
-        events.append(eventsThisUpdate);
+        events.insert(events.end(),eventsThisUpdate.begin(),eventsThisUpdate.end());
         for(stat_change change: changes)
             playerStatHistory[change.player].push_back(change);
     }

@@ -2,11 +2,11 @@
 
 statsInfo::statsInfo()
 {
-    if(statMapping.isEmpty())
+    if(statMapping.empty())
         init();
 }
 PESstat statsInfo::dummy = PESstat{};
-QHash<QString,PESstat*> statsInfo::statMapping = QHash<QString,PESstat*>{};
+std::map<QString,PESstat*> statsInfo::statMapping = std::map<QString,PESstat*>{};
 
 #define STAT_ENTRY_SIZE 4784
 #define STAT_COUNT 175

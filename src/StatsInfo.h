@@ -1,7 +1,7 @@
 #ifndef STATSINFO_H
 #define STATSINFO_H
 #include <QString>
-#include <QHash>
+#include <map>
 #include <stdint.h>
 #include <math.h>
 
@@ -87,14 +87,14 @@ class statsInfo
     static PESstat * const stats;
     static PESstat dummy;
 
-    static QHash<QString,PESstat*> statMapping;
+    static std::map<QString,PESstat*> statMapping;
 public:
     statsInfo();
 
     static void init(){
-        statMapping = QHash<QString,PESstat*>();
+        statMapping = std::map<QString,PESstat*>();
         for(int s = 0; s < statCount; ++s){
-            statMapping.insert(stats[s].name,stats+s);
+            statMapping.insert({stats[s].name,stats+s});
         }
     }
 
@@ -114,7 +114,7 @@ public:
     }
 
     static PESstat& getStat(QString str){
-        return *(statMapping.value(str,&dummy));
+        return *statMapping.at(str);
     }
 
     PESstat& operator[](size_t i){

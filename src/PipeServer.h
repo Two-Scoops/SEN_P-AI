@@ -4,9 +4,9 @@
 #include <QObject>
 #include <QLocalServer>
 #include <QLocalSocket>
-#include <QSet>
 #include <QString>
 #include <QJsonDocument>
+#include <vector>
 #include "Common.h"
 #include "Match.h"
 
@@ -75,7 +75,7 @@ signals:
 
 public slots:
     void newConnection();
-    void newEvent(match_event event, const QVector<match_event> &);
+    void newEvent(match_event event, const std::vector<match_event> &);
 
     void table_lost(match_time *when);
     void table_found(match_time *when);
@@ -87,7 +87,7 @@ private:
     QList<QJsonDocument> eventsThisMatch;
     bool areStatsFound = false;
 
-    QList<PipeClient*> clients;
+    std::vector<PipeClient*> clients;
     QLocalServer *server;
 
     void broadcastEvent(QJsonDocument event, Match *match, qint64 timestamp);
