@@ -3,9 +3,6 @@
 
 #include <QErrorMessage>
 
-#define MAJOR 1
-#define MINOR 1
-#define PATCH 0
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 

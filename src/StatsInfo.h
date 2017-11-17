@@ -6,7 +6,7 @@
 #include <math.h>
 
 enum type:char {
-    sint8, uint8, uint16, uint32, float32, uint32x9, uint32arr, validIndicator, cstring
+    sint8, sint32, uint8, uint16, uint32, float32, uint32x9, uint32arr, validIndicator, cstring
 };
 
 union stat_value {
@@ -33,6 +33,22 @@ struct PESstat {
 //    PESstat(int idx, ptrdiff_t _offset, type _type, uint8_t _count, const char *_name, bool _shown, bool _logged, const char *_comment = nullptr):
 //        name(_name), comment(_comment), offset(_offset), visualIndex(idx), statType(_type), count(_count), shown(_shown), logged(_logged) {
 //    }
+    type getStatValueType() const{
+        switch (statType) {
+        case sint8:
+        case sint32:
+            return sint32;
+        case uint8:
+        case uint16:
+        case uint32:
+        case uint32x9:
+        case uint32arr:
+            return uint32;
+        case float32:
+        default:
+            return float32;
+        }
+    }
 
     double getSegmentDouble(uint8_t *data, uint8_t segment = 0) const{
         if(segment >= count) return std::nan("");

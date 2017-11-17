@@ -1,5 +1,9 @@
 #ifndef COMMON_H
 #define COMMON_H
+//Version
+#define MAJOR 1
+#define MINOR 1
+#define PATCH 0
 
 #include "Match.h"
 #include "PipeServer.h"

@@ -5,7 +5,6 @@
 #include <QList>
 #include <QDateTime>
 #include <QJsonDocument>
-#include <QMap>
 #include "StatTableReader.h"
 #include "StatSelectionDialog.h"
 #include "StatsInfo.h"
@@ -15,6 +14,7 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
+
 
 class Match;
 
@@ -37,7 +37,7 @@ struct stat_change {
 };
 
 enum eventType: unsigned char {
-    goal, assist, ownGoal, yellowCard, redCard, subOn, subOff, teamsChanged, statsFound, statsLost, clockStopped, clockStarted
+    goal = 0, ownGoal, yellowCard, redCard, subOn, teamsChanged, statsFound, statsLost, clockStopped, clockStarted
 };
 
 struct match_event {
@@ -69,6 +69,7 @@ class Match : public QWidget
 
 public:
     explicit Match(StatTableReader *_reader, teamInfo homeInfo, teamInfo awayInfo, QWidget *parent = 0);
+    explicit Match(){}
     ~Match();
 
     double& getLastValue(int player, int stat){
@@ -79,8 +80,8 @@ public:
 
     QString toWikiFootballBox(QString current = QString());
 
-    const uint8_t totalPlayers;
-    const teamInfo home, away;
+    uint8_t totalPlayers;
+    teamInfo home, away;
     int homeScore = 0, awayScore = 0;
 
 
@@ -105,6 +106,9 @@ public:
         string<< std::put_time(std::gmtime(&time), qstr.toStdWString().data());
         return QString::fromStdWString(string.str());
     }
+
+    bool saveMatchAs(QString filename);
+    static Match* loadFromFile(QString filename);
     //================Event handling==================//
 public slots:
     void statsDisplayChanged(statsInfo &info);
@@ -141,6 +145,7 @@ private:
     int tickLastStopped = 0;
     int lastMinute = 0;
     int minuteTicks[121] = {-1};
+    int thisMatchLength = 0;
     static int matchLength; //In (realtime) minutes (as specified in the match settings)
 
 

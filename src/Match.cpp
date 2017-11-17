@@ -2,8 +2,15 @@
 #include "ui_match.h"
 #include "CustomTableStyle.h"
 #include <QScrollBar>
+#include <QFile>
+#include <QDataStream>
 #include <utility>
 #include <cmath>
+#include <type_traits>
+#include <memory>
+
+#include "Common.h"
+
 int Match::matchLength = 10;
 bool Match::benchShown = false;
 int Match::   goal_s;
@@ -15,6 +22,7 @@ int Match::   fmin_s;
 int Match::   lmin_s;
 int Match::  ticks_s;
 std::unordered_map<int,Match::pEvent> Match::statEvents;
+int Match::darkenRate = 19;
 
 Match::Match(StatTableReader *_reader, teamInfo homeInfo, teamInfo awayInfo, QWidget *parent) :
     QWidget(parent),
@@ -410,6 +418,7 @@ void Match::setLabels(int gameMinute, double time, double injuryTime){
 
 
 void Match::endMatch(){
+    thisMatchLength = matchLength;
     updateTimes.push_back(updateTimes.back());
     updateTimes.back().timestamp = QDateTime::currentMSecsSinceEpoch();
     for(int row = 0; row < ui->statsTable->rowCount(); ++row){
@@ -461,13 +470,294 @@ Match::~Match()
     delete ui;
 }
 
-int Match::darkenRate = 19;
+
+template<typename T> struct as_uint { typedef std::make_unsigned_t<T> type; };
+template<> struct as_uint<float> { typedef uint32_t type; };
+
+template <typename T>
+inline bool putNum(QFile &f, T n){
+    as_uint<T>::type u = (as_uint<T>::type)n;
+    bool good = true;
+    for(size_t i = 0; i < sizeof(T); ++i)
+        good = good && f.putChar((char)((u >> (i*8)) & 0xFF));
+    return good;
+}
+
+template <typename T> inline auto getNum(QFile &f, bool &good) -> T{
+    typedef as_uint<T>::type U;
+    U u = 0; char c = 0;
+    for(size_t i = 0; i < sizeof(T) && good; ++i){
+        good = good && f.getChar(&c);
+        if(good) u |= ((U)c) << (i*8);
+    }
+    return *(T*)&u;
+}
+
+const char *sectionNames[] = {
+    "matchInfo",
+    "finalStats",
+    "updateTimes",
+    "matchEvents",
+    "playerStatChanges"
+};
+enum { matchInfoSec = 0, finalStatsSec, updateTimesSec, matchEventsSec, playerStatChangesSec, TotalSecs};
+
+bool Match::saveMatchAs(QString filename) {
+    if(!filename.endsWith(".sen",Qt::CaseInsensitive))
+        filename.append(".sen");
+    QFile file(applyFilenameFormat(filename,matchCreationTime));
+    if(!file.open(QFile::ReadWrite | QFile::Truncate))
+        return false;
+    bool good = true;
+#define putN(TYPE,NUM) good = good && putNum(file,(TYPE)(NUM))
+#define putSTR(...) good = good && 0 <= file.write(__VA_ARGS__)
+#define RET_IF_ERROR() if(!good) return false
+    //=======Header======//
+    putSTR("SEN:P-AI",9);
+    putN( uint8_t,MAJOR);
+    putN( uint8_t,MINOR);
+    putN( uint8_t,PATCH);
+    putN(uint16_t,statsInfo::count());
+    putN( uint8_t,totalPlayers);
+    putN( uint8_t,thisMatchLength);
+    putN(uint16_t,5);//Section Count
+    RET_IF_ERROR();
+    //===Section entries===//
+    qint64 sectionTable = file.pos();
+    for(int i = 0; i < 5; ++i){
+        putN(uint32_t,0); //Section offset (Temporary)
+        putN(uint32_t,0); //Section size (Temporary)
+        putSTR(QByteArray(sectionNames[i]).leftJustified(24,'\0',true));
+    }
+    qint64 SectionPos[6] = {0};
+    RET_IF_ERROR();
+    //====="matchInfo" Section====//
+    SectionPos[0] = file.pos();
+    putN( int64_t,matchCreationTime);
+    putN( int64_t,matchStartTime);
+    putN( int64_t,matchEndTime);
+    putN(uint32_t,home.ID);
+    putN(uint32_t,away.ID);
+    putN( uint8_t,home.nPlayers);
+    putN( uint8_t,away.nPlayers);
+    putN( uint8_t,homeScore);
+    putN( uint8_t,awayScore);
+    putSTR(home.name.toUtf8().leftJustified(70,'\0',true));
+    putSTR(away.name.toUtf8().leftJustified(70,'\0',true));
+    //===Player entries===//
+    for(int8_t i = 0; i < home.nPlayers; ++i){
+        putN(uint32_t,home.player[i].ID);
+        putSTR(home.player[i].name.toUtf8().leftJustified(46,'\0',true));
+    }
+    for(int8_t i = 0; i < away.nPlayers; ++i){
+        putN(uint32_t,away.player[i].ID);
+        putSTR(away.player[i].name.toUtf8().leftJustified(46,'\0',true));
+    }
+    RET_IF_ERROR();
+    //===="finalStats" Section====//
+    SectionPos[1] = file.pos();
+    for(size_t s = 0; s < statsInfo::count(); ++s){
+        const type statT = statsInfo::getStat(s).getStatValueType();
+        for(uint8_t p = 0; p < totalPlayers; ++p){
+            switch (statT) {
+            case  sint32: putN( int32_t,getLastValue((int)p,(int)s)); break;
+            case  uint32: putN(uint32_t,getLastValue((int)p,(int)s)); break;
+            case float32: putN(   float,getLastValue((int)p,(int)s)); break;
+            }
+        }
+    }
+    RET_IF_ERROR();
+    //===="updateTimes" Section====//
+    SectionPos[2] = file.pos();
+    putN(uint32_t,updateTimes.size());
+    putN(uint32_t,halfTimeTick);
+    putN(uint32_t,extraTimeTick);
+    putN(uint32_t,extraHalfTimeTick);
+    std::unordered_map<const match_time*,uint32_t> ptr2idx;
+    for(uint32_t i = 0; i < (uint32_t)updateTimes.size(); ++i){
+        match_time &t = updateTimes[i];
+        putN(int64_t,t.timestamp);
+        putN(int32_t,t.gameTick);
+        putN(  float,t.gameMinute);
+        putN(  float,t.injuryMinute);
+        ptr2idx.insert({&t,i});
+    }
+    RET_IF_ERROR();
+    //===="matchEvents" Section====//
+    SectionPos[3] = file.pos();
+    putN(uint32_t,events.size());
+    for(const match_event &e : events){
+        putN(uint32_t,ptr2idx.at(e.when));
+        putN(  int8_t,e.player1);
+        putN(  int8_t,e.player2);
+        putN( uint8_t,e.type);
+        putN( uint8_t,0);//Reserved
+    }
+    RET_IF_ERROR();
+    //===="playerStatChanges" Section====//
+    SectionPos[4] = file.pos();
+    for(uint8_t p = 0; p < 64; ++p)
+        putN(uint32_t,playerStatHistory[p].size());
+    for(uint8_t p = 0; p < totalPlayers; ++p){
+        for(const stat_change &c : playerStatHistory[p]){
+            putN(uint32_t,ptr2idx.at(c.when));
+            switch(statsInfo::getStat(c.statId).getStatValueType()){
+            case  sint32: putN( int32_t,c.newVal.i); break;
+            case  uint32: putN(uint32_t,c.newVal.u); break;
+            case float32: putN(   float,c.newVal.f); break;
+            }
+            putN(int16_t,c.statId);
+            putN(uint8_t,c.segment);
+        }
+    }
+    RET_IF_ERROR();
+    //====Rewrite Section entries===//
+    SectionPos[5] = file.pos();
+    for(int i = 0; i < 5; ++i){
+        file.seek(sectionTable + i*32);
+        //Section offset (Final)
+        putN(uint32_t,SectionPos[i]);
+        //Section size (Final)
+        putN(uint32_t,SectionPos[i+1] - SectionPos[i]);
+    }
+    file.close();
+    return good;
+}
+
+
+
+Match* Match::loadFromFile(QString filename){
+    QFile file(filename);
+    if(!file.open(QFile::ReadOnly))
+        return nullptr;
+    std::unique_ptr<Match> result(new Match());
+    bool good = true, tmpGood = true;
+#define getN(TYPE) getNum<TYPE>(file,good)
+#define setGood(PRED) tmpGood = good && (PRED); good = tmpGood
+    //=====Header=====//
+    setGood(file.read(9).startsWith("SEN:P-AI\0"));
+    RET_IF_ERROR();
+    setGood(MAJOR == getN(uint8_t));
+    setGood(MINOR >= getN(uint8_t));
+    getN(uint8_t);//PATCH (don't matta)
+    RET_IF_ERROR();
+    setGood(statsInfo::count() == (size_t)getN(uint16_t));
+    result->totalPlayers = getN(uint8_t);
+    result->thisMatchLength = getN(uint8_t);
+    const uint16_t sectionCount = getN(uint16_t);
+    //===Section entries===//
+    uint32_t offsets[TotalSecs] = {0};
+    uint32_t sizes[TotalSecs] = {0};
+    for(uint16_t sec = 0; sec < sectionCount; ++sec){
+        uint32_t offset = getN(uint32_t);
+        uint32_t size = getN(uint32_t);
+        QByteArray name = file.read(24);
+        for(int i = 0; i < TotalSecs; ++i){
+            if(name.startsWith(sectionNames[i])){
+                offsets[i] = offset;
+                sizes[i] = size;
+            }
+        }
+    }
+    RET_IF_ERROR();
+    //====="matchInfo" Section====//
+    setGood(file.seek(offsets[matchInfoSec]));
+    result->matchCreationTime = getN(int64_t);
+    result->matchStartTime = getN(int64_t);
+    result->matchEndTime = getN(int64_t);
+    teamInfo &home = result->home, &away = result->away;
+    home.ID = getN(uint32_t);
+    away.ID = getN(uint32_t);
+    home.nPlayers = getN(uint8_t);
+    away.nPlayers = getN(uint8_t);
+    result->homeScore = getN(uint8_t);
+    result->awayScore = getN(uint8_t);
+    home.name = QString(file.read(70));
+    away.name = QString(file.read(70));
+    setGood(home.nPlayers > 0 && away.nPlayers > 0);
+    RET_IF_ERROR();
+    //===Player entries===//
+    for(uint8_t i = 0; i < home.nPlayers; ++i){
+        home.player[i].ID = getN(uint32_t);
+        home.name = QString(file.read(46));
+    }
+    for(uint8_t i = 0; i < away.nPlayers; ++i){
+        away.player[i].ID = getN(uint32_t);
+        away.name = QString(file.read(46));
+    }
+    RET_IF_ERROR();
+    //====="finalStats" Section====//
+    setGood(file.seek(offsets[finalStatsSec]));
+    result->latestStats.resize(statsInfo::count() * result->totalPlayers, 0.0);
+    for(int s = 0; s < (int)statsInfo::count(); ++s){
+        for(int p = 0; p < (int)result->totalPlayers; ++p){
+            switch(statsInfo::getStat((size_t)s).getStatValueType()){
+            case  uint32: result->getLastValue(p,s) = getN(uint32_t); break;
+            case  sint32: result->getLastValue(p,s) = getN( int32_t); break;
+            case float32: result->getLastValue(p,s) = getN(   float); break;
+            }
+        }
+    }
+    RET_IF_ERROR();
+    //====="updateTimes" Section====//
+    setGood(file.seek(offsets[updateTimesSec]));
+    const uint32_t updateCount = getN(uint32_t);
+    std::deque<match_time> &updateTimes = result->updateTimes;
+    updateTimes.resize(updateCount,match_time{});
+    result->halfTimeTick = getN(int32_t);
+    result->extraTimeTick = getN(int32_t);
+    result->extraHalfTimeTick = getN(int32_t);
+    //===Update Entries===//
+    for(uint32_t i = 0; i < updateCount && 0 < updateCount; ++i){
+        match_time when;
+        when.match = result.get();
+        when.timestamp = getN(int64_t);
+        when.gameMinute = getN(float);
+        when.injuryMinute = getN(float);
+        when.gameTick = getN(int32_t);
+        updateTimes[i] = when;
+    }
+    RET_IF_ERROR();
+    //====="matchEvents" Section====//
+    setGood(file.seek(offsets[matchEventsSec]));
+    const uint32_t eventCount = getN(uint32_t);
+    result->events.reserve(eventCount);
+    //===Event Entries===//
+    for(uint32_t i = 0; i < eventCount && 0 < eventCount; ++i){
+        //{when, Player1, Player2, type}
+        match_event e{&updateTimes.at(getN(uint32_t)), getN(int8_t), getN(int8_t), (eventType)getN(uint8_t)};
+        result->events.push_back(e);
+        getN(uint8_t);//Reserved byte
+    }
+    RET_IF_ERROR();
+    //====="playerStatChanges" Section====//
+    setGood(file.seek(offsets[playerStatChangesSec]));
+    uint32_t playerChangeCount[64] = {0};
+    for(int p = 0; p < 64; ++p)
+        playerChangeCount[p] = getN(uint32_t);
+    for(int p = 0; p < result->totalPlayers; ++p){
+        for(uint32_t i = 0; i < playerChangeCount[p] && 0 < playerChangeCount[p]; ++i){
+            stat_change c;
+            c.when = &updateTimes.at(getN(uint32_t));
+            file.seek(file.pos() + 4);
+            c.statId = getN(int16_t);
+            c.segment = getN(uint8_t);
+            switch (statsInfo::getStat(c.statId).getStatValueType()) {
+            case  sint32: c.newVal.i = getN(int32_t); break;
+            case  uint32: c.newVal.u = getN(uint32_t); break;
+            case float32: c.newVal.f = getN(float); break;
+            }
+            result->playerStatHistory[p].push_back(c);
+        }
+    }
+    RET_IF_ERROR();
+    return result.release();
+}
 
 QString match_event::eventLogString(){
     QString result = QString("%1").arg(when->minuteString(),7);
     switch(type){
     case goal:
-    case assist:
         result +=              "' GOAL: " + player1Name();
         if(player2 >= 0)
             result += "\n         assist: " + player2Name();
@@ -482,7 +772,6 @@ QString match_event::eventLogString(){
         result +=              "' RED: " + player1Name();
         break;
     case subOn:
-    case subOff:
         result +=              "' IN: " + player1Name();
         if(player2 >= 0)
             result += "\n         OUT: " + player2Name();
@@ -505,7 +794,6 @@ QJsonDocument match_event::toJSON(){
 
     switch (type) {
     case goal:
-    case assist:
         res["event"] = "Goal";
         res["team"] = isHome ? "Home" : "Away";
         res["scorer"] = player1Obj;
@@ -530,7 +818,6 @@ QJsonDocument match_event::toJSON(){
         res["player"] = player1Obj;
         break;
     case subOn:
-    case subOff:
         res["event"] = "Player Sub";
         res["team"] = isHome ? "Home" : "Away";
         res["playerIn"] = player1Obj;
