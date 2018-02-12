@@ -5,8 +5,10 @@
 #include <QLabel>
 #include <QTimer>
 #include <QDateTime>
+#include <deque>
 #include "Common.h"
 #include "CustomTableStyle.h"
+#include "MatchReader.h"
 
 namespace Ui {
 class MainWindow;
@@ -21,30 +23,31 @@ public:
     ~MainWindow();
 
 private slots:
+    void newMatch(Match *match);
+    void doneMatch(QString tabText);
 
-    void showTime();
-    void table_lost();
-    void table_found(uint8_t *data);
-    void teams_changed(qint64, teamInfo home, teamInfo away);
+    void on_openButton_clicked();
+    void on_saveButton_clicked();
+    void on_saveasButton_clicked();
+    void saveCurrentMatch();
+    void currentMatchUpdated();
 
-    void on_columnsButton_clicked();
-    void on_settingsButton_clicked();
+    void on_matchTabs_tabCloseRequested(int index);
 
 signals:
     void statsDisplayChanged(statsInfo &info);
+    void settingsChanged();
 
 private:
     Ui::MainWindow *ui = nullptr;
-    QDateTime *clock = nullptr;
     statsInfo info;
-    StatTableReader *reader = nullptr;
-    QTimer *updateTimer = nullptr;
     statSelectionDialog *statsSelect = nullptr;
     SettingsDialog *settingsDialog = nullptr;
-    PipeServer *server = nullptr;
-
-    Match *currMatch = nullptr;
-    teamInfo currHome, currAway;
+    MatchReader *reader;
+    QTimer *autosaveTimer;
+    std::deque<QString> loadedFilenames;
+    QSettings settings;
+    void saveMatch(int tab, QString name = QString());
 };
 
 

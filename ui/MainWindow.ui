@@ -15,58 +15,50 @@
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout">
-    <property name="spacing">
-     <number>3</number>
-    </property>
+    <item>
+     <widget class="MatchReader" name="reader" native="true"/>
+    </item>
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QLabel" name="qrCode">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
+       <widget class="QPushButton" name="openButton">
+        <property name="maximumSize">
          <size>
-          <width>29</width>
-          <height>29</height>
+          <width>55</width>
+          <height>16777215</height>
          </size>
         </property>
-        <property name="toolTipDuration">
-         <number>-1</number>
-        </property>
         <property name="text">
-         <string/>
+         <string>Open</string>
+        </property>
+        <property name="flat">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="timeLabel">
-        <property name="font">
-         <font>
-          <pointsize>10</pointsize>
-         </font>
+       <widget class="QPushButton" name="saveButton">
+        <property name="maximumSize">
+         <size>
+          <width>55</width>
+          <height>16777215</height>
+         </size>
         </property>
         <property name="text">
-         <string>Jan 0, 00:00:00.000 UTC</string>
+         <string>Save</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="showTime">
-        <property name="minimumSize">
+       <widget class="QPushButton" name="saveasButton">
+        <property name="maximumSize">
          <size>
-          <width>0</width>
-          <height>29</height>
+          <width>55</width>
+          <height>16777215</height>
          </size>
         </property>
         <property name="text">
-         <string>show time</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
+         <string>Save as</string>
         </property>
        </widget>
       </item>
@@ -114,11 +106,13 @@
       <property name="currentIndex">
        <number>-1</number>
       </property>
+      <property name="tabsClosable">
+       <bool>true</bool>
+      </property>
      </widget>
     </item>
    </layout>
   </widget>
-  <widget class="QStatusBar" name="statusBar"/>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
@@ -129,46 +123,16 @@
     </rect>
    </property>
   </widget>
-  <action name="actionDisplayed_Stats">
-   <property name="text">
-    <string>Displayed Stats</string>
-   </property>
-  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <customwidgets>
+  <customwidget>
+   <class>MatchReader</class>
+   <extends>QWidget</extends>
+   <header>src/MatchReader.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
- <connections>
-  <connection>
-   <sender>showTime</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>timeLabel</receiver>
-   <slot>setVisible(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>231</x>
-     <y>47</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>65</x>
-     <y>46</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>showTime</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>qrCode</receiver>
-   <slot>setVisible(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>210</x>
-     <y>42</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>32</x>
-     <y>52</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>

@@ -12,7 +12,6 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     setWindowTitle("SEN:P-AI v" + QCoreApplication::applicationVersion());
-    QSettings settings;
     settings.beginGroup("MainWindow");
     resize(settings.value("size", size()).toSize());
     move(settings.value("pos",pos()).toPoint());
@@ -20,88 +19,42 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->matchTabs->setStyle(new MyStyle(style(),ui->matchTabs));
 
-
     statsSelect = new statSelectionDialog(info,this);
     settingsDialog = new SettingsDialog(this);
 
+    reader = ui->reader;
+    connect(this,&MainWindow::settingsChanged, reader,&MatchReader::settingsChanged);
+    connect(reader,&MatchReader::new_match, this,&MainWindow::newMatch);
+    connect(reader,&MatchReader::done_match, this,&MainWindow::doneMatch);
+    connect(reader,&MatchReader::matchUpdated, this,&MainWindow::currentMatchUpdated);
+    connect(ui->showBenched,&QPushButton::toggled, reader,&MatchReader::show_benced);
 
-    QTimer *timer = new QTimer(this);
-    QrTimestamp *qrcode = new QrTimestamp(ui->qrCode,this);
-    connect(timer,&QTimer::timeout, qrcode,&QrTimestamp::update);
-    connect(timer,&QTimer::timeout, this,&MainWindow::showTime);
-    timer->start(33);
+    autosaveTimer = new QTimer(this);
+    autosaveTimer->setInterval(settings.value("MatchAutosaveInterval",10000).toInt());
+    connect(autosaveTimer,&QTimer::timeout, this,&MainWindow::saveCurrentMatch);
+    if(settings.value("MatchAutosaveTimed",false).toBool())
+        autosaveTimer->start();
 
 
-    reader = new StatTableReader(L"PES2017.exe",this);
-    server = new PipeServer(this);
+    settingsDialog->setModal(true);
+    connect(ui->settingsButton,&QPushButton::clicked, settingsDialog,&SettingsDialog::exec);
+    connect(settingsDialog,&SettingsDialog::accepted, this, [this]{
+        emit settingsChanged();
+        autosaveTimer->setInterval(settings.value("MatchAutosaveInterval",10000).toInt());
+        if(settings.value("MatchAutosaveTimed",false).toBool())
+            autosaveTimer->start();
+        else
+            autosaveTimer->stop();
+    });
 
-    updateTimer = new QTimer(this);
-    connect(updateTimer,&QTimer::timeout,               reader,&StatTableReader::update);
-    connect(reader,&StatTableReader::status_changed,   ui->statusBar,&QStatusBar::showMessage);
-    connect(reader,&StatTableReader::table_lost,       this,&MainWindow::table_lost);
-    connect(reader,&StatTableReader::table_found,      this,&MainWindow::table_found);
-    connect(reader,&StatTableReader::teamsChanged,      this,&MainWindow::teams_changed);
-    updateTimer->start(settings.value("UpdateRate",100).toInt());
-
-}
-
-void MainWindow::showTime(){
-    ui->timeLabel->setText(QDateTime::currentDateTimeUtc().toString("MMM dd, hh:mm:ss.zzz t"));
-}
-
-void MainWindow::table_lost(){
-    if(currMatch == nullptr)
-        return;
-    currMatch->endMatch();
-    disconnect(currMatch, 0,0,0);
-    disconnect(reader, 0, currMatch, 0);
-    disconnect(updateTimer, 0, currMatch, 0);
-
-    currMatch = nullptr;
-}
-
-void MainWindow::teams_changed(qint64, teamInfo home, teamInfo away){
-    if(currMatch != nullptr){
-        ui->matchTabs->removeTab(ui->matchTabs->indexOf(currMatch));
-    }
-    if(home.name[0] == '\0' || away.name[0] == '\0'){
-        currMatch = nullptr;
-        return;
-    }
-    currHome = home; currAway = away;
-    currMatch = new Match(reader,home,away,this);
-    connect(this, &MainWindow::statsDisplayChanged, currMatch, &Match::statsDisplayChanged);
-    connect(currMatch,&Match::table_found, server,&PipeServer::table_found);
-    connect(currMatch,&Match::table_lost, server,&PipeServer::table_lost);
-    connect(currMatch,&Match::newEvent, server,&PipeServer::newEvent);
-
-    int currentTab = ui->matchTabs->currentIndex();
-    ui->matchTabs->insertTab(0,currMatch,QStringLiteral("%1 vs %2").arg(home.name).arg(away.name));
-    if(currentTab == 0)
-        ui->matchTabs->setCurrentIndex(0);
-    server->teamsChanged(currMatch);
-    emit statsDisplayChanged(info);
-}
-
-void MainWindow::table_found(uint8_t *data){
-    if(!currMatch){
-        currMatch = new Match(reader,currHome,currAway,this);
-        connect(this, &MainWindow::statsDisplayChanged, currMatch, &Match::statsDisplayChanged);
-
-        int currentTab = ui->matchTabs->currentIndex();
-        ui->matchTabs->insertTab(0,currMatch,QStringLiteral("%1 vs %2").arg(currHome.name).arg(currAway.name));
-        if(currentTab == 0)
-            ui->matchTabs->setCurrentIndex(0);
+    statsSelect->setModal(true);
+    connect(ui->columnsButton,&QPushButton::clicked, statsSelect,&statSelectionDialog::exec);
+    connect(statsSelect,&statSelectionDialog::accepted, this, [this]{
         emit statsDisplayChanged(info);
-    }
-    currMatch->stats_found(data);
-    currMatch->showBenched(ui->showBenched->isChecked());
-    connect(ui->showBenched,&QCheckBox::toggled, currMatch, &Match::showBenched);
-    connect(reader,&StatTableReader::statTableUpdate, currMatch, &Match::update);
+    });
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow(){
     QSettings settings;
     settings.beginGroup("MainWindow");
     settings.setValue("size", size());
@@ -110,16 +63,95 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::on_columnsButton_clicked()
-{
-    statsSelect->setModal(true);
-    statsSelect->exec();
-    emit statsDisplayChanged(info);
+void MainWindow::newMatch(Match *match){
+    int currentTab = ui->matchTabs->currentIndex();
+    ui->matchTabs->insertTab(0,match,QStringLiteral("*Current Match"));
+    if(currentTab == 0)
+        ui->matchTabs->setCurrentIndex(0);
+
+    match->showBenched(ui->showBenched->isChecked());
+    match->statsDisplayChanged(info);
+    connect(this,&MainWindow::statsDisplayChanged, match,&Match::statsDisplayChanged);
+    connect(ui->showBenched,  &QCheckBox::toggled, match,&Match::showBenched);
+
+    loadedFilenames.push_front(QString());
+    if(settings.value("MatchAutosaveOnEnd",false).toBool() || settings.value("MatchAutosaveTimed",false).toBool()){
+        loadedFilenames.front() = match->applyFilenameFormat(settings.value("MatchAutosaveFile",QString()).toString(),match->timestamp());
+    }
+}
+
+void MainWindow::doneMatch(QString tabText){
+    Match* match = qobject_cast<Match*>(ui->matchTabs->widget(0));
+    if(ui->matchTabs->tabText(0).startsWith('*')){
+        ui->matchTabs->setTabText(0,"*"+tabText);
+        if(settings.value("MatchAutosaveOnEnd",false).toBool())
+            saveMatch(0,match->applyFilenameFormat(settings.value("MatchAutosaveFile",QString()).toString(),match->timestamp()));
+    } else
+        ui->matchTabs->setTabText(0,tabText);
 }
 
 
-void MainWindow::on_settingsButton_clicked(){
-    settingsDialog->setModal(true);
-    settingsDialog->exec();
-    updateTimer->setInterval(QSettings().value("UpdateRate",100).toInt());
+#include <QFileDialog>
+void MainWindow::on_openButton_clicked(){
+    int tab = 0;
+    if(ui->matchTabs->count() > 0 && ui->matchTabs->tabText(0).endsWith("Current Match"))
+        tab = 1;
+    QStringList names = QFileDialog::getOpenFileNames(this,"Load Matches",QString(),"SEN:P-AI files (*.sen)");
+    for(QString &name: names){
+        if(names.isEmpty())
+            continue;
+        Match *match = new Match();
+        if(!Match::file<load>(match,name))
+            continue;
+        ui->matchTabs->insertTab(tab,match,name.mid(name.lastIndexOf(QRegExp("[\\\\/]"))+1));
+        loadedFilenames.insert(loadedFilenames.begin()+tab,name);
+        match->showBenched(ui->showBenched->isChecked());
+        match->statsDisplayChanged(info);
+        connect(this,&MainWindow::statsDisplayChanged, match,&Match::statsDisplayChanged);
+        connect(ui->showBenched,  &QCheckBox::toggled, match,&Match::showBenched);
+    }
+}
+void MainWindow::saveMatch(int tab, QString name){
+    Match *match = qobject_cast<Match*>(ui->matchTabs->widget(tab));
+    if(!match) return;
+    if(name.isEmpty()){
+        name = QFileDialog::getSaveFileName(this,"Save Match As",settings.value("MatchSaveDir",QString()).toString(),"SEN:P-AI files (*.sen)");
+        if(name.isEmpty())
+            return;
+        int dirIdx = name.lastIndexOf(QRegExp("[\\\\/]"));
+        settings.setValue("MatchSaveDir",name.left(dirIdx));
+    }
+    if(!Match::file<save>(match,name))
+        return;
+    QString text = ui->matchTabs->tabText(tab);
+    if(text.startsWith(QChar('*')))
+        ui->matchTabs->setTabText(tab,text.mid(1));
+    loadedFilenames[ui->matchTabs->currentIndex()] = name;
+}
+
+void MainWindow::on_saveButton_clicked(){
+    int tab = ui->matchTabs->currentIndex();
+    if(tab >= 0)
+        saveMatch(tab,loadedFilenames[tab]);
+}
+
+void MainWindow::on_saveasButton_clicked(){
+    saveMatch(ui->matchTabs->currentIndex());
+}
+
+void MainWindow::saveCurrentMatch(){
+    Match *match = qobject_cast<Match*>(ui->matchTabs->widget(0));
+    if(ui->matchTabs->count() && ui->matchTabs->tabText(0).endsWith("Current Match"))
+        saveMatch(0,match->applyFilenameFormat(settings.value("MatchAutosaveFile",QString()).toString(),match->timestamp()));
+}
+
+void MainWindow::currentMatchUpdated(){
+    ui->matchTabs->setTabText(0,"*Current Match");
+}
+
+void MainWindow::on_matchTabs_tabCloseRequested(int index){
+    //Don't close the current match
+    if(ui->matchTabs->tabText(index).endsWith("Current Match"))
+        return;
+    ui->matchTabs->removeTab(index);
 }

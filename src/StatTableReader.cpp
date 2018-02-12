@@ -22,7 +22,7 @@
 #define isSameTeam(A,B) (teamIdOf(A) == teamIdOf(B))
 
 #define MAX_PLAYERS 32
-static uint8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t *teamID) {
+static uint8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t) {
     uint32_t playerID = 0;
     uint32_t maybeID = 0;
     int entries = 0;
@@ -37,10 +37,10 @@ static uint8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t *teamID) {
         entries++;
         addr += STAT_ENTRY_SIZE;
     }
-    if(entries >= 11 && teamID)
-        *teamID = teamIdOf(playerID);
     return entries;
 }
+
+
 
 #define TEAM_MEM_STATE MEM_COMMIT
 #define TEAM_MEM_TYPE MEM_PRIVATE
@@ -69,204 +69,316 @@ static uint8_t countTeamPlayerEntries(HANDLE PES, uintptr_t base_addr){
     return count;
 }
 
-
-void StatTableReader::update(){
+bool StatTableReader::updateProcess(){
     //Check if process is still opened
-    if (proccessHandle != NULL) {
-        DWORD exitCode = 0;
-        if (GetExitCodeProcess(proccessHandle, &exitCode)) {
-            if (exitCode != STILL_ACTIVE) {
-                //Process was closed, close handle
-                CloseHandle(proccessHandle);
-                proccessHandle = NULL;
-                basePtr = homePtr = awayPtr = teamDataPtr = nullptr;
-                emit status_changed(QStringLiteral("%1 closed").arg(QString::fromWCharArray(proccessName)),0);
-                emit table_lost();
-                return;
-            }
+    DWORD exitCode = 0;
+    if (GetExitCodeProcess(processHandle, &exitCode)) {
+        if (exitCode != STILL_ACTIVE) {
+            //Process was closed, close handle
+            CloseHandle(processHandle);
+            processHandle = NULL;
+            basePtr = homePtr = awayPtr = teamDataPtr = nullptr;
+            emit status_changed(QStringLiteral("SEN:P-AI noticed %1 close").arg(QString::fromWCharArray(proccessName)));
+            emit table_lost();
+            return false;
         } else {
-            emit status_changed(QStringLiteral("Program does not have access to Exit Code"),0);
-            return;
+            return true;
         }
+    } else {
+        emit status_changed(QStringLiteral("SEN:P-AI does not have access to Exit Code"));
+        return false;
     }
+}
 
-    if(proccessHandle){ //Procces is found
-        if(teamDataPtr){ //Team Data is found
-            emit status_changed(QStringLiteral("Updating data"),0);
-            if(ReadProcessMemory(proccessHandle, teamDataPtr, prevTeamData, sizeof(teamDataTable), NULL)){ //Team Data read succeeds
-                std::swap(currTeamData,prevTeamData);
-                //If either team has changed
-                if(currTeamData->homeData.teamID != prevTeamData->homeData.teamID || currTeamData->awayData.teamID != prevTeamData->awayData.teamID){
-                    teamInfo home, away;
-                    home.name = QString::fromUtf8(currTeamData->homeData.teamName);
-                    home.ID = currTeamData->homeData.teamID;
-                    home.nPlayers = 0;
-                    for(int i = 0; i < 32; ++i){
-                        if(currTeamData->homeData.players[i].playerValid.validIndicator != -1){
-                            teamDataTable::playerEntry &player = currTeamData->homePlayers[i];
-                            home.player[home.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
-                        }
-                    }
+bool StatTableReader::findProcess(){
+    emit action_changed(QStringLiteral("Searching for %1...").arg(QString::fromWCharArray(proccessName)));
+    //Try to find process by name
+    DWORD pesID = 0;
+    {
+        PROCESSENTRY32 entry;
+        entry.dwSize = sizeof(PROCESSENTRY32);
 
-                    away.name = QString::fromUtf8(currTeamData->awayData.teamName);
-                    away.ID = currTeamData->awayData.teamID;
-                    away.nPlayers = 0;
-                    for(int i = 0; i < 32; ++i){
-                        if(currTeamData->awayData.players[i].playerValid.validIndicator != -1){
-                            teamDataTable::playerEntry &player = currTeamData->awayPlayers[i];
-                            away.player[away.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
-                        }
-                    }
-
-                    emit status_changed(QStringLiteral("Teams changed"),0);
-                    emit teamsChanged(QDateTime::currentMSecsSinceEpoch(),home,away);
-                } else { //If neither team has changed
-                    //go find what else changed
-                    for(size_t i = 0; i < sizeof(teamDataTable); ++i){
-                        uint8_t currByte = ((uint8_t*)currTeamData)[i];
-                        uint8_t prevByte = ((uint8_t*)prevTeamData)[i];
-                        if(currByte != prevByte)
-                            emit teamDataChanged(i,prevByte,currByte);
-                    }
-                }//End If/Else either team has/hasn't changed
-
-                //TODO insert some team data shit here
-
-
-                if(basePtr){ //Stat Table is found
-                    emit status_changed(QStringLiteral("Updating stats"),0);
-                    int homeRead = ReadProcessMemory(proccessHandle, homePtr, prevData,                        _nHome*STAT_ENTRY_SIZE, NULL);
-                    int awayRead = ReadProcessMemory(proccessHandle, awayPtr, prevData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
-                    if(homeRead && awayRead){ //Table read succeeds
-                        std::swap(currData,prevData);
-                        emit statTableUpdate(currData,prevData);
-                    } else { //Table read fails
-                        basePtr = homePtr = awayPtr = nullptr;
-                        emit status_changed(QStringLiteral("Stats table lost"),0);
-                        emit table_lost();
-                    }
-                } else { //Table is lost
-                    emit status_changed(QStringLiteral("Searching for stats table..."),0);
-                    MEMORY_BASIC_INFORMATION info;
-
-                    //Ask Windows for information on every block of memory in the proccess, starting at zero
-                    for(uintptr_t mappingAddr = 0;
-                        VirtualQueryEx(proccessHandle, (void*)mappingAddr, &info, sizeof(info)) > 0;
-                        mappingAddr = mappingAddr + info.RegionSize) {
-                        //If the properties of the memory block match what we're looking for
-                        if ((info.State & STAT_MEM_STATE) && (info.Type & STAT_MEM_TYPE) && (info.Protect & STAT_MEM_PROTEC) && (info.RegionSize == STAT_MEM_SIZE)) {
-                            //Check set memory offsets in the block and count how many Player IDs are found
-                            uint8_t homeCount = countTableEntries(proccessHandle,(mappingAddr+HOME_OFFSET),&_homeID);
-                            uint8_t awayCount = countTableEntries(proccessHandle,(mappingAddr+AWAY_OFFSET),&_awayID);
-
-                            //If there are enough players to make two valid teams
-                            if (homeCount >= 11 && awayCount >= 11) {
-                                //Set target proccess pointers
-                                basePtr = (uint8_t*) mappingAddr;
-                                homePtr = (uint8_t*)(mappingAddr+HOME_OFFSET);
-                                awayPtr = (uint8_t*)(mappingAddr+AWAY_OFFSET);
-                                //If the number of valid players on each team is different than it was before, reallocate the player entries array and fix all the pointers
-                                if(homeCount != _nHome || awayCount != _nAway){
-                                    currData = data = (uint8_t*)realloc(data,(homeCount+awayCount)*STAT_ENTRY_SIZE*2);
-                                    prevData = currData + ((homeCount+awayCount)*STAT_ENTRY_SIZE);
-                                    //fix all the pointers and counts
-                                    _nHome = homeCount;
-                                    _nAway = awayCount;
-                                    _nPlayers = homeCount + awayCount;
-                                }
-                                //Do an initial update of the stats table
-                                ReadProcessMemory(proccessHandle, homePtr, currData,                        _nHome*STAT_ENTRY_SIZE, NULL);
-                                ReadProcessMemory(proccessHandle, awayPtr, currData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
-                                emit status_changed(QStringLiteral("Stats table found"),0);
-                                emit table_found(currData);
-                                break;
-                            }//End If enough valid players
-                        }//End If matching memory block
-                    }//End For every memory block in the proccess
-                }//End If/Else stats table is found/lost
-            } else { //Team data read fails
-                teamDataPtr = nullptr;
-                emit status_changed(QStringLiteral("Team Data table lost"),0);
-                emit teamData_lost();
-            }
-        } else { //Team data is lost
-            emit status_changed(QStringLiteral("Searching for Team Data table..."),0);
-            MEMORY_BASIC_INFORMATION info;
-
-            //Ask Windows for information on every block of memory in the proccess, starting at zero
-            for(uintptr_t mappingAddr = 0;
-                VirtualQueryEx(proccessHandle, (void*)mappingAddr, &info, sizeof(info)) > 0;
-                mappingAddr = mappingAddr + info.RegionSize) {
-                //If the properties of the memory block match what we're looking for
-                if ((info.State & TEAM_MEM_STATE) && (info.Type & TEAM_MEM_TYPE) && (info.Protect & TEAM_MEM_PROTEC) && (info.RegionSize == TEAM_MEM_SIZE)) {
-                    //Check set memory offsets in the block and count how many Player IDs are found
-                    uint8_t playerCount = countTeamPlayerEntries(proccessHandle, mappingAddr);
-                    //If there are enough players to make two valid teams
-                    if(playerCount >= 22){
-                        teamDataPtr = (teamDataTable*)(mappingAddr + TEAM_MEM_OFFSET);
-                        //Do an initial read of the team data
-                        ReadProcessMemory(proccessHandle, teamDataPtr, currTeamData, sizeof(teamDataTable), NULL);
-                        teamInfo home, away;
-                        home.name = QString::fromUtf8(currTeamData->homeData.teamName);
-                        home.ID = currTeamData->homeData.teamID;
-                        home.nPlayers = 0;
-                        for(int i = 0; i < 32; ++i){
-                            if(currTeamData->homeData.players[i].playerValid.validIndicator != -1){
-                                teamDataTable::playerEntry &player = currTeamData->homePlayers[i];
-                                home.player[home.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
-                            }
-                        }
-                        away.name = QString::fromUtf8(currTeamData->awayData.teamName);
-                        away.ID = currTeamData->awayData.teamID;
-                        away.nPlayers = 0;
-                        for(int i = 0; i < 32; ++i){
-                            if(currTeamData->awayData.players[i].playerValid.validIndicator != -1){
-                                teamDataTable::playerEntry &player = currTeamData->awayPlayers[i];
-                                away.player[away.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
-                            }
-                        }
-                        emit status_changed(QStringLiteral("Team data found"),0);
-                        emit teamsChanged(QDateTime::currentMSecsSinceEpoch(),home,away);
-                        break;
-                    } //End if enough valid players
-                }//If matching memory block
-            }//End For every memory block in the proccess
-        }//End If/Else team data is found/lost
-
-    } else { //Proccess is lost
-        emit status_changed(QStringLiteral("Searching for %1...").arg(QString::fromWCharArray(proccessName)),0);
-        //Try to find process by name
-        DWORD pesID = 0;
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+        //Loop through every available proccess and compare its name to the target name
+        if (Process32First(snapshot, &entry) == TRUE)
         {
-            PROCESSENTRY32 entry;
-            entry.dwSize = sizeof(PROCESSENTRY32);
-
-            HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
-            //Loop through every available proccess and compare its name to the target name
-            if (Process32First(snapshot, &entry) == TRUE)
+            while (Process32Next(snapshot, &entry) == TRUE)
             {
-                while (Process32Next(snapshot, &entry) == TRUE)
+                if (_wcsicmp(entry.szExeFile, proccessName) == 0)
                 {
-                    if (_wcsicmp(entry.szExeFile, proccessName) == 0)
-                    {
-                        pesID =  entry.th32ProcessID;
-                        break;
-                    }
+                    pesID =  entry.th32ProcessID;
+                    break;
                 }
             }
-            CloseHandle(snapshot);
         }
-        //If a proccess was found
-        if (pesID != 0) {
-            //open handle to process
-            proccessHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,FALSE,pesID);
-            if (proccessHandle == NULL) {
-                emit status_changed(QStringLiteral("Failed to open %1 with debug access\n").arg(QString::fromWCharArray(proccessName)),0);
-            } else {
-                emit status_changed(QStringLiteral("Found %1").arg(QString::fromWCharArray(proccessName)),0);
+        CloseHandle(snapshot);
+    }
+    //If a process was found
+    if (pesID != 0) {
+        //open handle to process
+        processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,FALSE,pesID);
+        if (processHandle == NULL) {
+            emit status_changed(QStringLiteral("SEN:P-AI failed to open %1 with debug access\n").arg(QString::fromWCharArray(proccessName)));
+            return false;
+        } else {
+            emit status_changed(QStringLiteral("SEN:P-AI noticed %1!").arg(QString::fromWCharArray(proccessName)));
+            return true;
+        }
+    } else {//no process was found
+        return false;
+    }
+}
+
+bool StatTableReader::updateTeams(){
+    emit action_changed(QStringLiteral("Updating data"));
+    if(ReadProcessMemory(processHandle, teamDataPtr, prevTeamData, sizeof(teamDataTable), NULL)){ //Team Data read succeeds
+        std::swap(currTeamData,prevTeamData);
+        //If either team has changed
+        if(currTeamData->homeData.teamID != prevTeamData->homeData.teamID || currTeamData->awayData.teamID != prevTeamData->awayData.teamID){
+            teamInfo home, away;
+            home.name = QString::fromUtf8(currTeamData->homeData.teamName);
+            home.ID = currTeamData->homeData.teamID;
+            home.nPlayers = 0;
+            for(int i = 0; i < 32; ++i){
+                if(currTeamData->homeData.players[i].playerValid.validIndicator != -1){
+                    teamDataTable::playerEntry &player = currTeamData->homePlayers[i];
+                    home.player[home.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
+                }
             }
+
+            away.name = QString::fromUtf8(currTeamData->awayData.teamName);
+            away.ID = currTeamData->awayData.teamID;
+            away.nPlayers = 0;
+            for(int i = 0; i < 32; ++i){
+                if(currTeamData->awayData.players[i].playerValid.validIndicator != -1){
+                    teamDataTable::playerEntry &player = currTeamData->awayPlayers[i];
+                    away.player[away.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
+                }
+            }
+
+            emit status_changed(QStringLiteral("SEN:P-AI noticed new teams!"));
+            emit teamsChanged(QDateTime::currentMSecsSinceEpoch(),home,away);
+        } else { //If neither team has changed
+            //go find what else changed
+            for(size_t i = 0; i < sizeof(teamDataTable); ++i){
+                uint8_t currByte = ((uint8_t*)currTeamData)[i];
+                uint8_t prevByte = ((uint8_t*)prevTeamData)[i];
+                if(currByte != prevByte)
+                    emit teamDataChanged(i,prevByte,currByte);
+            }
+        }//End If/Else either team has/hasn't changed
+
+        //TODO insert some team data shit here
+        return true;
+    } else { //Team data read fails
+        teamDataPtr = nullptr;
+        emit status_changed(QStringLiteral("SEN:P-AI lost track of teams"));
+        emit teamData_lost();
+        return false;
+    }
+}
+
+bool StatTableReader::findTeams(){
+    emit action_changed(QStringLiteral("Searching for Team Data table..."));
+    MEMORY_BASIC_INFORMATION info;
+
+    //Ask Windows for information on every block of memory in the proccess, starting at zero
+    for(uintptr_t mappingAddr = 0;
+        VirtualQueryEx(processHandle, (void*)mappingAddr, &info, sizeof(info)) > 0;
+        mappingAddr = mappingAddr + info.RegionSize) {
+        //If the properties of the memory block match what we're looking for
+        if ((info.State & TEAM_MEM_STATE) && (info.Type & TEAM_MEM_TYPE) && (info.Protect & TEAM_MEM_PROTEC) && (info.RegionSize == TEAM_MEM_SIZE)) {
+            //Check set memory offsets in the block and count how many Player IDs are found
+            uint8_t playerCount = countTeamPlayerEntries(processHandle, mappingAddr);
+            //If there are enough players to make two valid teams
+            if(playerCount >= 22){
+                teamDataPtr = (teamDataTable*)(mappingAddr + TEAM_MEM_OFFSET);
+                //Do an initial read of the team data
+                ReadProcessMemory(processHandle, teamDataPtr, currTeamData, sizeof(teamDataTable), NULL);
+                teamInfo home, away;
+                home.name = QString::fromUtf8(currTeamData->homeData.teamName);
+                _homeID = home.ID = currTeamData->homeData.teamID;
+                home.nPlayers = 0;
+                for(int i = 0; i < 32; ++i){
+                    if(currTeamData->homeData.players[i].playerValid.validIndicator != -1){
+                        teamDataTable::playerEntry &player = currTeamData->homePlayers[i];
+                        home.player[home.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
+                    }
+                }
+                away.name = QString::fromUtf8(currTeamData->awayData.teamName);
+                _awayID = away.ID = currTeamData->awayData.teamID;
+                away.nPlayers = 0;
+                for(int i = 0; i < 32; ++i){
+                    if(currTeamData->awayData.players[i].playerValid.validIndicator != -1){
+                        teamDataTable::playerEntry &player = currTeamData->awayPlayers[i];
+                        away.player[away.nPlayers++] = {QString::fromUtf8(player.playerName), player.playerID, player.playerCondition};
+                    }
+                }
+                emit status_changed(QStringLiteral("SEN:P-AI noticed the teams!"));
+                emit teamsChanged(QDateTime::currentMSecsSinceEpoch(),home,away);
+                return true;
+            } //End if enough valid players
+        }//End If matching memory block
+    }//End For every memory block in the proccess
+    return false;
+}
+
+bool StatTableReader::updateStats(){
+    emit action_changed(QStringLiteral("Updating stats"));
+    int homeRead = ReadProcessMemory(processHandle, homePtr, prevData,                        _nHome*STAT_ENTRY_SIZE, NULL);
+    int awayRead = ReadProcessMemory(processHandle, awayPtr, prevData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+    if(homeRead && awayRead){ //Table read succeeds
+        bool stillValid = true;
+        for(int i = 0; i < _nHome + _nAway && stillValid; ++i){
+            stillValid = stillValid && currData[i*STAT_ENTRY_SIZE] == prevData[i*STAT_ENTRY_SIZE];
         }
-    }//End If/Else proccess found/lost
+        if(stillValid){
+            std::swap(currData,prevData);
+            emit statTableUpdate(currData,prevData);
+            return true;
+        }
+    } //Table read fails or player ids changed
+    basePtr = homePtr = awayPtr = nullptr;
+    emit status_changed(QStringLiteral("SEN:P-AI lost track of stats"));
+    emit table_lost();
+    return false;
+}
+
+void StatTableReader::doStatsFound(uint8_t homeCount, uint8_t awayCount){
+    //If the number of valid players on each team is different than it was before, reallocate the player entries array and fix all the pointers
+    if(homeCount != _nHome || awayCount != _nAway){
+        currData = data = (uint8_t*)realloc(data,(homeCount+awayCount)*STAT_ENTRY_SIZE*2);
+        prevData = currData + ((homeCount+awayCount)*STAT_ENTRY_SIZE);
+        //fix all the pointers and counts
+        _nHome = homeCount;
+        _nAway = awayCount;
+        _nPlayers = homeCount + awayCount;
+    }
+    //Do an initial update of the stats table
+    ReadProcessMemory(processHandle, homePtr, currData,                        _nHome*STAT_ENTRY_SIZE, NULL);
+    ReadProcessMemory(processHandle, awayPtr, currData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+    emit status_changed(QStringLiteral("SEN:P-AI noticed the stats!"));
+    emit table_found(currData);
+}
+
+bool StatTableReader::findStats(){
+    emit action_changed(QStringLiteral("Searching for stats table..."));
+    MEMORY_BASIC_INFORMATION info;
+
+    //Ask Windows for information on every block of memory in the proccess, starting at zero
+    for(uintptr_t mappingAddr = 0;
+        VirtualQueryEx(processHandle, (void*)mappingAddr, &info, sizeof(info)) > 0;
+        mappingAddr = mappingAddr + info.RegionSize) {
+        //If the properties of the memory block match what we're looking for
+        if ((info.State & STAT_MEM_STATE) && (info.Type & STAT_MEM_TYPE) && (info.Protect & STAT_MEM_PROTEC) && (info.RegionSize == STAT_MEM_SIZE)) {
+            //Check set memory offsets in the block and count how many Player IDs are found
+            uint8_t homeCount = countTableEntries(processHandle,(mappingAddr+HOME_OFFSET),_homeID);
+            uint8_t awayCount = countTableEntries(processHandle,(mappingAddr+AWAY_OFFSET),_awayID);
+
+            //If there are enough players to make two valid teams
+            if (homeCount >= 11 && awayCount >= 11) {
+                //Set target proccess pointers
+                basePtr = (uint8_t*) mappingAddr;
+                homePtr = (uint8_t*)(mappingAddr+HOME_OFFSET);
+                awayPtr = (uint8_t*)(mappingAddr+AWAY_OFFSET);
+                doStatsFound(homeCount, awayCount);
+                return true;
+            }//End If enough valid players
+        }//End If matching memory block
+    }//End For every memory block in the proccess
+    return false;
+}
+
+void StatTableReader::tryReadBlock(uintptr_t src, uint8_t *dest, size_t size){
+    if(!ReadProcessMemory(processHandle,(void*)src,dest,size, NULL)){
+        if(size == 1) *dest = 0;
+        if(size <= 0) return;
+        size_t half = size/2;
+        tryReadBlock(src,dest,half);
+        tryReadBlock(src+half,dest+half,size-half);
+    }
+}
+
+#include "emmintrin.h"
+bool StatTableReader::bruteForceStats(){
+    MEMORY_BASIC_INFORMATION info;
+#define AWAY_DIFF 0x28E30
+
+    //Ask Windows for information on every block of memory in the proccess, starting at zero
+    for(uintptr_t mappingAddr = 0;
+        VirtualQueryEx(processHandle, (void*)mappingAddr, &info, sizeof(info)) > 0;
+        mappingAddr = mappingAddr + info.RegionSize) {
+        //If the properties of the memory block match what we're looking for
+        if ((info.State & STAT_MEM_STATE) && (info.Type & STAT_MEM_TYPE) && (info.Protect & STAT_MEM_PROTEC) && (info.RegionSize > 0)){
+            size_t regionSize = info.RegionSize;
+            if(regionSize > searchSize){
+                if(searchSize > 0)
+                    _mm_free(searchSpace);
+                searchSpace = (uint32_t*)_mm_malloc((searchSize = (uint32_t)regionSize),16);
+                if(searchSpace == nullptr){
+                    qDebug() << "Allocation failed";
+                    return false;
+                }
+            }
+//            tryReadBlock(mappingAddr,(uint8_t*)searchSpace,regionSize);
+            if(!ReadProcessMemory(processHandle,(void*)(mappingAddr),searchSpace,regionSize, NULL))
+                continue;
+            const __m128i* ptr = (const __m128i*)searchSpace;
+            const uint32_t player = (_homeID*100)+1;
+            const __m128i comp = _mm_set1_epi32(player);//Compare to the player ID of home team player 1
+            const __m128i mask = _mm_set1_epi8(~0);
+            const size_t numVectors = (regionSize)/16;
+            //For every 128bit vector in the valid search area
+            for(size_t i = 0; i < numVectors; i++){
+                __m128i eq = _mm_cmpeq_epi32(_mm_load_si128(ptr+i),comp);
+                if(!_mm_test_all_zeros(eq,mask)){//If any elements matched
+                    int j = -1;
+                    while(ptr[i].m128i_u32[++j] != player);//check which element matched
+                    uintptr_t homeAddr = mappingAddr + ((i*4)+j)*4;
+                    uintptr_t awayAddr = homeAddr + AWAY_DIFF;
+
+                    uint8_t homeCount = countTableEntries(processHandle,homeAddr,_homeID);
+                    uint8_t awayCount = countTableEntries(processHandle,awayAddr,_awayID);
+                    //If there are enough players to make two valid teams
+                    if (homeCount >= 11 && awayCount >= 11) {
+                        //Set target proccess pointers
+                        basePtr = (uint8_t*) mappingAddr;
+                        homePtr = (uint8_t*) homeAddr;
+                        awayPtr = (uint8_t*) awayAddr;
+                        doStatsFound(homeCount, awayCount);
+                        return true;
+                    }//End If enough valid players
+                }//End If any elements matched
+            }//End for every 128bit vector
+        }//End If matching memory block
+    }//End For every memory block in the proccess
+    return false;
+}
+
+
+void StatTableReader::update(){
+    switch (status) {
+    default:
+    case None:
+        if(findProcess()) status = Process;
+        break;
+    case Process:
+        if(!updateProcess()) status = None;
+        else if(findTeams()) status = Teams;
+        break;
+    case Teams:
+        if(!updateTeams()) status = Process;
+        else if(findStats()) status = Stats;
+        break;
+    case Stats:
+        if(!updateStats()) status = Teams;
+        break;
+    case BruteForce:
+        if(bruteForceStats()) status = Stats;
+        else status = Teams;
+        break;
+    }
+    butt->setEnabled(status == Teams);
 }
 
 

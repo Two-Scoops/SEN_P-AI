@@ -19,6 +19,12 @@ public:
 private slots:
     void on_SettingsDialog_accepted();
 
+    void on_SettingsDialog_rejected();
+
+    void on_autosaveOnEnd_toggled(bool checked);
+
+    void on_autosaveTimed_toggled(bool checked);
+
 private:
     Ui::SettingsDialog *ui;
 };

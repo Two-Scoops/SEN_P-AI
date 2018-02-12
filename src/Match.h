@@ -15,7 +15,6 @@
 #include <iomanip>
 #include <ctime>
 
-
 class Match;
 
 struct match_time {
@@ -36,14 +35,17 @@ struct stat_change {
     int8_t player;
 };
 
-enum eventType: unsigned char {
-    goal = 0, ownGoal, yellowCard, redCard, subOn, teamsChanged, statsFound, statsLost, clockStopped, clockStarted
+enum eventType: char {
+    unknown = -1, goal = 0, ownGoal, yellowCard, redCard, subOn,
+    teamsChanged, statsFound, statsLost, clockStopped, clockStarted,
+    //clockStopped reasons:
+    foul, offside, goalkick, cornerkick, throwin, halfend
 };
 
 struct match_event {
     const match_time *when;
     int8_t player1, player2;
-    eventType type;
+    eventType type, reason;
     bool isHome;
 
 
@@ -58,6 +60,11 @@ struct match_event {
     QJsonDocument toJSON();
 };
 
+enum FileAction: bool{
+    load = false,
+    save = true
+};
+
 
 namespace Ui {
 class Match;
@@ -66,17 +73,38 @@ class Match;
 class Match : public QWidget
 {
     Q_OBJECT
+    friend class MatchReader;
+    QFontMetrics getFont() const;
+    match_time* addUpdateTime(float gameMinute = -1.0f, int gameTick = 0, float injuryTime = -1.0f){
+        updateTimes.push_back(match_time{this,QDateTime::currentMSecsSinceEpoch(),gameMinute,injuryTime,gameTick});
+        return &updateTimes.back();
+    }
+    void addEvent(const match_time *when, eventType type, int8_t p1, int8_t p2 = -1, eventType reason = unknown){
+        addEvent(match_event{when,p1,p2,type,reason, p1 < home.nPlayers});
+    }
+    void addEvent(match_event event);
+    QString addStatCell(int r, int c, double val);
+    void setColumnWidths(std::vector<int> &maxWidths);
+    void setLabels(int gameMinute, double time, double injuryTime);
+    void updateTableStat(int p, int s, double val, QString& str, bool changed);
+    bool isHome(int player) const{
+        return player < home.nPlayers;
+    }
+    void logEvent(match_event &event);
+    int  getLogScroll();
+    void setLogScroll(int val);
 
 public:
-    explicit Match(StatTableReader *_reader, teamInfo homeInfo, teamInfo awayInfo, QWidget *parent = 0);
-    explicit Match(){}
+    explicit Match(teamInfo homeInfo, teamInfo awayInfo, QWidget *parent = 0);
+    explicit Match();
+    void init();
     ~Match();
 
     double& getLastValue(int player, int stat){
         return latestStats[vectorPosition(player,stat)];
     }
 
-    void endMatch();
+    void endMatch(int length);
 
     QString toWikiFootballBox(QString current = QString());
 
@@ -107,46 +135,25 @@ public:
         return QString::fromStdWString(string.str());
     }
 
-    bool saveMatchAs(QString filename);
-    static Match* loadFromFile(QString filename);
+    template<FileAction act>
+    static bool file(Match *match, QString filename);
     //================Event handling==================//
 public slots:
     void statsDisplayChanged(statsInfo &info);
     void showBenched(bool shown);
-    void stats_found(uint8_t *data);
-
-    void update(uint8_t *currData, uint8_t *prevData);
 
 signals:
-    void clock_stopped(quint64 timestamp, quint32 gameTick, float gameMinute, float injuryMinute);
-    void clock_started(quint64 timestamp, quint32 gameTick, float gameMinute, float injuryMinute);
-    void newEvent(match_event event, const std::vector<match_event> &previousEvents);
-
-
-    void table_lost(match_time *when);
-    void table_found(match_time *when);
-
 protected:
     //to handle copying the table via CTRL+C
     void keyPressEvent(QKeyEvent *event);
 
 private:
     Ui::Match *ui;
-    StatTableReader *reader;
     static int darkenRate;
-    static bool benchShown;
 
     //================Time-keeping==================//
-    enum gameHalf {
-        unknown =-1, firstHalf, firstHalfInjury, secondHalf, secondHalfInjury, firstET, firstETInjury, secondET, secondETInjury
-    } currentHalf = unknown;
     int halfTimeTick = -1, extraTimeTick = -1, extraHalfTimeTick = -1;
-    int tickLastUpdate = 0;
-    int tickLastStopped = 0;
-    int lastMinute = 0;
-    int minuteTicks[121] = {-1};
-    int thisMatchLength = 0;
-    static int matchLength; //In (realtime) minutes (as specified in the match settings)
+    uint8_t matchLength = 0;
 
 
     //================Record-keeping==================//
@@ -161,16 +168,8 @@ private:
     //All stat changes, separated by player and each referencing an updateTimes entry
     std::vector<stat_change> playerStatHistory[64];
 
-    static int goal_s, assist_s, owngoal_s, yellow_s, red_s, fmin_s, lmin_s, ticks_s;
-    struct pEvent { bool is1; eventType type; };
-    static std::unordered_map<int,pEvent> statEvents;
-
 
     //================Utility==================//
-    void setLabels(int gameMinute, double time, double injuryTime);
-
-    void recalcTime(int gameTick, float &gameMinute, float &injuryMinute);
-
     static int vectorPosition(int player, int stat){
         return player * (int)statsInfo::count() + stat;
     }
@@ -180,5 +179,7 @@ inline QString match_event::player1Name() const{ return when->match->getPlayerNa
 inline QString match_event::player2Name() const{ return when->match->getPlayerName(player2); }
 inline quint32 match_event::player1Id() const{ return when->match->getPlayerId(player1); }
 inline quint32 match_event::player2Id() const{ return when->match->getPlayerId(player2); }
+extern template bool Match::file<load>(Match *match, QString filename);
+extern template bool Match::file<save>(Match *match, QString filename);
 
 #endif // MATCH_H

@@ -17,8 +17,11 @@ PipeServer::PipeServer(QObject *parent) : QObject(parent)
 void PipeServer::newConnection(){
     while(server->hasPendingConnections()){
         PipeClient *client = new PipeClient(server->nextPendingConnection(),this);
-        client->sendEvent(lastTeamsChanged);
-        client->sendEvent(lastStatsFound);
+        if(!lastTeamsChanged.isEmpty()){
+            client->sendEvent(lastTeamsChanged);
+            if(!lastStatsFound.isEmpty())
+                client->sendEvent(lastStatsFound);
+        }
         clients.push_back(client);
         if(!server->errorString().isEmpty())
             qDebug() << server->errorString();
@@ -27,7 +30,7 @@ void PipeServer::newConnection(){
         qDebug() << server->errorString();
 }
 //TODO handle connections and incoming messages
-void PipeServer::newEvent(match_event event, const std::vector<match_event> &){
+void PipeServer::newEvent(match_event event){
     broadcastEvent(event.toJSON(),event.when->match);
 }
 

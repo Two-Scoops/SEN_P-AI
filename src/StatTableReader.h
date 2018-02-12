@@ -4,6 +4,7 @@
 #include <cmath>
 #include <QString>
 #include <QtCore>
+#include <QPushButton>
 #include "TeamDataTable.h"
 
 #define MAX_PLAYERS 32
@@ -26,12 +27,15 @@ class StatTableReader: public QObject
 {
     Q_OBJECT
 public:
-    StatTableReader(const wchar_t *name, QObject *parent = 0): QObject(parent),
+    StatTableReader(const wchar_t *name, QPushButton *butte, QObject *parent = 0): QObject(parent),
         _nHome(0), _nAway(0), _nPlayers(0), _homeID(0), _awayID(0),
         data(nullptr), currData(nullptr), prevData(nullptr),
         basePtr(nullptr), homePtr(nullptr), awayPtr(nullptr),
-        proccessName(name), proccessHandle(nullptr),
-        teamDataPtr(nullptr), currTeamData(&(teamData[0])), prevTeamData(&(teamData[1])){}
+        proccessName(name), processHandle(nullptr),
+        teamDataPtr(nullptr), currTeamData(&(teamData[0])), prevTeamData(&(teamData[1])){
+        butt = butte;
+        connect(butte,&QPushButton::released,this,&StatTableReader::bruteForce);
+    }
 
     int nHome() const{ return _nHome; }
     int nAway() const{ return _nAway; }
@@ -50,8 +54,17 @@ public:
     };
 public slots:
     void update();
+    void bruteForce(){
+        if(status == Teams){
+            status = BruteForce;
+            emit action_changed(QStringLiteral("SEARCHING HARDER..."));
+        }
+    }
+
 signals:
-    void status_changed(QString str, int timeout);
+    void status_changed(QString str);
+    void action_changed(QString str);
+
     void statTableUpdate(uint8_t *curr, uint8_t *prev);
     void table_lost();
     void table_found(uint8_t *data);
@@ -64,14 +77,29 @@ private:
     uint32_t _homeID, _awayID;
     uint8_t *data, *currData, *prevData;
 
-
     void *basePtr, *homePtr, *awayPtr;
     const wchar_t* proccessName;
-    void* proccessHandle;
+    void* processHandle;
 
     void *teamDataPtr;
     teamDataTable *currTeamData, *prevTeamData;
     teamDataTable teamData[2];
+
+    enum {
+        None, Process, Teams, Stats, BruteForce
+    } status = None;
+    QPushButton *butt;
+
+    bool findProcess();
+    bool updateProcess();
+    bool findTeams();
+    bool updateTeams();
+    bool findStats();
+    bool updateStats();
+    bool bruteForceStats();
+    uint32_t *searchSpace = nullptr, searchSize = 0;
+    void doStatsFound(uint8_t homeCount, uint8_t awayCount);
+    void tryReadBlock(uintptr_t src, uint8_t *dest, size_t size);
 };
 
 

@@ -23,6 +23,7 @@ public:
 
     void sendEvent(QJsonDocument event){
         QByteArray data = event.toJson();
+        qDebug().noquote() << data;
         quint32 size = data.size();
         const unsigned char sizeArr[] = {
             (size>> 0) & 255,
@@ -75,7 +76,7 @@ signals:
 
 public slots:
     void newConnection();
-    void newEvent(match_event event, const std::vector<match_event> &);
+    void newEvent(match_event event);
 
     void table_lost(match_time *when);
     void table_found(match_time *when);

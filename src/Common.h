@@ -2,7 +2,7 @@
 #define COMMON_H
 //Version
 #define MAJOR 1
-#define MINOR 1
+#define MINOR 2
 #define PATCH 0
 
 #include "Match.h"

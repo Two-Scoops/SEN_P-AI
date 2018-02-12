@@ -26,7 +26,8 @@ SOURCES +=\
     lib/QR-Code-generator/QrSegment.cpp \
     lib/QR-Code-generator/QrCode.cpp \
     lib/QR-Code-generator/BitBuffer.cpp \
-    src/QrTimestamp.cpp
+    src/QrTimestamp.cpp \
+    src/MatchReader.cpp
 
 HEADERS  += \
     src/Common.h \
@@ -44,13 +45,15 @@ HEADERS  += \
     lib/QR-Code-generator/QrSegment.hpp \
     lib/QR-Code-generator/QrCode.hpp \
     lib/QR-Code-generator/BitBuffer.hpp \
-    src/QrTimestamp.h
+    src/QrTimestamp.h \
+    src/MatchReader.h
 
 FORMS    += \
     ui/MainWindow.ui \
     ui/Match.ui \
     ui/SettingsDialog.ui \
-    ui/StatSelectionDialog.ui
+    ui/StatSelectionDialog.ui \
+    ui/MatchReader.ui
 
 
 QMAKE_LFLAGS += /MANIFESTUAC:$$quote(\"level=\'requireAdministrator\' uiAccess=\'false\'\")
