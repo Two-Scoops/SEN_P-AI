@@ -53,7 +53,9 @@ public slots:
         qDebug("Function Entered");
         if(socket != nullptr){
             socket->abort();
+            disconnect(socket,0,this,0);
         }
+        disconnect(this,0,0,0);
         socket = nullptr;
         qDebug("Function returned");
     }
@@ -61,7 +63,9 @@ public slots:
         qDebug("Function Entered");
         if(socket != nullptr){
             socket->abort();
+            disconnect(socket,0,this,0);
         }
+        disconnect(this,0,0,0);
         socket = nullptr;
         qDebug("Function returned");
     }

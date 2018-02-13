@@ -112,13 +112,14 @@ void PipeServer::broadcastEvent(QJsonDocument event, Match *match, qint64 timest
     log.open(QIODevice::ReadWrite | QIODevice::Text | QIODevice::Append);
     log.write(event.toJson());
     log.close();
-    auto i = clients.begin();
-    for(; i != clients.end(); ++i){
-        if((*i)->valid())
-            (*i)->sendEvent(event);
+    for(int i = 0; i < clients.size(); ++i){
+        if(clients[i]->valid())
+            clients[i]->sendEvent(event);
         else{
-            (*i)->deleteLater();
-            clients.erase(i);
+            qDebug("client invalid, removing");
+            clients[i]->deleteLater();
+            clients.erase(clients.begin() + i);
+            --i;
         }
     }
     dbgReturn();
