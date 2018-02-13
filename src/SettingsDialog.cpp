@@ -21,7 +21,7 @@ void SettingsDialog::on_SettingsDialog_accepted()
     settings.setValue("MatchAutosaveFile",ui->matchSaveEdit->text());
     settings.setValue("MatchAutosaveOnEnd",ui->autosaveOnEnd->isChecked());
     settings.setValue("MatchAutosaveTimed",ui->autosaveTimed->isChecked());
-    settings.setValue("MatchAutosaveInterval",ui->autosaveInterval->value());
+    settings.setValue("MatchAutosaveInterval",ui->autosaveInterval->value()/1000);
     settings.setValue("UpdateRate",ui->updateRate->value());
 }
 
@@ -32,7 +32,7 @@ void SettingsDialog::on_SettingsDialog_rejected()
     ui->matchSaveEdit->setText(settings.value("MatchAutosaveFile",ui->matchSaveEdit->text()).toString());
     ui->autosaveOnEnd->setChecked(settings.value("MatchAutosaveOnEnd",ui->autosaveOnEnd->isChecked()).toBool());
     ui->autosaveTimed->setChecked(settings.value("MatchAutosaveTimed",ui->autosaveTimed->isChecked()).toBool());
-    ui->autosaveInterval->setValue(settings.value("MatchAutosaveInterval",ui->autosaveInterval->value()).toInt());
+    ui->autosaveInterval->setValue(settings.value("MatchAutosaveInterval",ui->autosaveInterval->value()*1000).toInt());
     ui->updateRate->setValue(settings.value("UpdateRate",ui->updateRate->value()).toInt());
 }
 
