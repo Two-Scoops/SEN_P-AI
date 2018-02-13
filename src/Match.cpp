@@ -107,7 +107,6 @@ QFontMetrics Match::getFont() const{
 }
 
 void Match::addEvent(match_event event){
-    qDebug("Function Entered");
     events.push_back(event);
     //Tally Scoreline
     if(event.type == goal)
@@ -115,27 +114,24 @@ void Match::addEvent(match_event event){
     else if(event.type == ownGoal)
         (event.isHome ? awayScore : homeScore) += 1;
     logEvent(event);
-    dbgReturn(return);
 }
 void Match::logEvent(match_event &event){
-    qDebug("Function Entered");
     //TODO use actual team colors
     ui->eventLog->setTextBackgroundColor(QColor(event.isHome ? "#e0e0fc" : "#ffe0dd"));
     QString logStr = event.eventLogString();
     if(!logStr.isEmpty())
         ui->eventLog->append(logStr);
-    dbgReturn(return);
+    return;
 }
 
 QString Match::addStatCell(int r, int c, double val){
-    qDebug("Function Entered");
     QString str = QString::number(val,'g',10);
     QTableWidgetItem *item = new QTableWidgetItem(str);
     //TODO use actual team colors
     item->setBackground(QBrush(QColor(r < home.nPlayers ? "#E5E5FC" : "#FFE9E8")));
     ui->statsTable->setItem(r,c,item);
     getLastValue(r,c) = val;
-    dbgReturn(return str);
+    return str;
 }
 
 void Match::setColumnWidths(std::vector<int> &maxWidths){
@@ -147,7 +143,6 @@ void Match::setColumnWidths(std::vector<int> &maxWidths){
 }
 
 void Match::setLabels(int gameMinute, double time, double injuryTime){
-    qDebug("Function Entered");
     ui->hScoreLabel->setText(QString::number(homeScore));
     ui->aScoreLabel->setText(QString::number(awayScore));
     QString minuteString = QString::number(gameMinute);
@@ -158,11 +153,9 @@ void Match::setLabels(int gameMinute, double time, double injuryTime){
     else
         minuteString += ":" + QString("%1").arg((int)(std::fmod(time,1.0) * 60),2,10,QChar('0'));
     ui->clockLabel->setText(minuteString);
-    dbgReturn(return);
 }
 
 void Match::updateTableStat(int p, int s, double val, QString &str, bool changed){
-    qDebug("Function Entered");
     QTableWidgetItem *item = ui->statsTable->item(p,s);
     if(changed){
         latestStats[vectorPosition(p,s)] = val;
@@ -175,7 +168,6 @@ void Match::updateTableStat(int p, int s, double val, QString &str, bool changed
         if(v > 0)
             item->setTextColor(QColor::fromHsv(h, s, std::max(0,v-darkenRate), a));
     }
-    dbgReturn(return);
 }
 
 int Match::getLogScroll(){ return ui->eventLog->verticalScrollBar()->value(); }
@@ -197,10 +189,8 @@ void Match::endMatch(int length){
 }
 
 void Match::showBenched(bool shown){
-    qDebug("Function Entered");
     for(int p = 0; p < totalPlayers; ++p)
         ui->statsTable->setRowHidden(p, !shown && 0 > getLastValue(p,statsInfo::firstMinuteOnPitch));
-    dbgReturn(return);
 }
 
 Match::~Match()
@@ -211,7 +201,6 @@ Match::~Match()
 
 
 QString match_event::eventLogString(){
-    qDebug("Function Entered");
     QString result = QString("%1").arg(when->minuteString(),7);
     switch(type){
     case goal:
@@ -233,13 +222,12 @@ QString match_event::eventLogString(){
         if(player2 >= 0)
             result += "\n         OUT: " + player2Name();
         break;
-    default: dbgReturn(return QString());
+    default: return QString();
     }
-    dbgReturn(return result);
+    return result;
 }
 
 QJsonDocument match_event::toJSON(){
-    qDebug("Function Entered");
     QJsonObject res = when->startEventObject();
     QJsonObject player1Obj{
         {"name",player1Name()},
@@ -311,11 +299,10 @@ QJsonDocument match_event::toJSON(){
     default:
         break;
     }
-    dbgReturn(return QJsonDocument(res));
+    return QJsonDocument(res);
 }
 
 QString match_time::minuteString() const{
-    qDebug("Function Entered");
     double time = gameMinute, injuryTime = injuryMinute;
     QString minuteString = QString::number((int)gameMinute);
     if(std::isnan(injuryTime))
@@ -324,11 +311,10 @@ QString match_time::minuteString() const{
         minuteString += "+" + QString::number((int)injuryTime) + ":" + QString("%1").arg((int)(std::fmod(injuryTime,1.0) * 60),2,10,QChar('0'));
     else
         minuteString += ":" + QString("%1").arg((int)(std::fmod(time,1.0) * 60),2,10,QChar('0'));
-    dbgReturn(return minuteString);
+    return minuteString;
 }
 
 QJsonObject match_time::startEventObject() const{
-    qDebug("Function Entered");
     QJsonObject res{
         {"type", "Event"},
         {"timestamp", timestamp},
@@ -338,7 +324,7 @@ QJsonObject match_time::startEventObject() const{
         res["injuryMinute"] = true;
     else if(injuryMinute >= 0)
         res["injuryMinute"] = injuryMinute;
-    dbgReturn(return res);
+    return res;
 }
 
 

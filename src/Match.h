@@ -135,6 +135,7 @@ public:
         std::wstringstream string;
         std::time_t time = (std::time_t)(timestamp/1000);
         string<< std::put_time(std::gmtime(&time), qstr.toStdWString().data());
+        qDebug("Function returned");
         return QString::fromStdWString(string.str());
     }
 
