@@ -33,6 +33,7 @@ public:
         basePtr(nullptr), homePtr(nullptr), awayPtr(nullptr),
         proccessName(name), processHandle(nullptr),
         teamDataPtr(nullptr), currTeamData(&(teamData[0])), prevTeamData(&(teamData[1])){
+        qDebug("Function Entered");
         butt = butte;
         connect(butte,&QPushButton::released,this,&StatTableReader::bruteForce);
     }
@@ -98,8 +99,7 @@ private:
     bool updateStats();
     bool bruteForceStats();
     uint32_t *searchSpace = nullptr, searchSize = 0;
-    void doStatsFound(uint8_t homeCount, uint8_t awayCount);
-    void tryReadBlock(uintptr_t src, uint8_t *dest, size_t size);
+    bool doStatsFound(uint8_t homeCount, uint8_t awayCount);
 };
 
 

@@ -15,4 +15,6 @@
 #include <QDebug>
 #include <QString>
 
+#define dbgReturn(...) do{ qDebug("Function returned"); __VA_ARGS__; }while(false)
+
 #endif // COMMON_H

@@ -14,14 +14,17 @@ class PipeClient : public QObject{
     Q_OBJECT
 public:
     explicit PipeClient(QLocalSocket *s, QObject *parent = 0): QObject(parent), socket(s){
+        qDebug("Function Entered");
         connect(socket,&QLocalSocket::disconnected, this, &PipeClient::disconnected);
         //The Qt fuckwits decided to overload QLocalSocket::error and then make you do this casting bullshit
         connect(socket,static_cast<void(QLocalSocket::*)(QLocalSocket::LocalSocketError)>(&QLocalSocket::error),
                 this, &PipeClient::error);
         connect(socket,&QLocalSocket::readyRead, this, &PipeClient::readyRead);
+        qDebug("Function returned");
     }
 
     void sendEvent(QJsonDocument event){
+        qDebug("Function Entered");
         QByteArray data = event.toJson();
         qDebug().noquote() << data;
         quint32 size = data.size();
@@ -34,6 +37,7 @@ public:
         data.prepend((const char*)sizeArr,4);
         if(valid())
             socket->write(data);
+        qDebug("Function returned");
     }
 
     bool valid() const{ return socket != nullptr; }
@@ -46,16 +50,20 @@ public:
 
 public slots:
     void disconnected(){
+        qDebug("Function Entered");
         if(socket != nullptr){
             socket->abort();
         }
         socket = nullptr;
+        qDebug("Function returned");
     }
     void error(QLocalSocket::LocalSocketError){
+        qDebug("Function Entered");
         if(socket != nullptr){
             socket->abort();
         }
         socket = nullptr;
+        qDebug("Function returned");
     }
     void readyRead(){
         if(valid())

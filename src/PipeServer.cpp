@@ -15,6 +15,7 @@ PipeServer::PipeServer(QObject *parent) : QObject(parent)
 
 
 void PipeServer::newConnection(){
+    qDebug("Function Entered");
     while(server->hasPendingConnections()){
         PipeClient *client = new PipeClient(server->nextPendingConnection(),this);
         if(!lastTeamsChanged.isEmpty()){
@@ -28,14 +29,18 @@ void PipeServer::newConnection(){
     }
     if(!server->errorString().isEmpty())
         qDebug() << server->errorString();
+    dbgReturn();
 }
 //TODO handle connections and incoming messages
 void PipeServer::newEvent(match_event event){
+    qDebug("Function Entered");
     broadcastEvent(event.toJSON(),event.when->match);
+    dbgReturn();
 }
 
 
 void PipeServer::table_lost(match_time *when){
+    qDebug("Function Entered");
     areStatsFound = false;
     QJsonObject event{
         {"type","Event"},
@@ -47,9 +52,11 @@ void PipeServer::table_lost(match_time *when){
     if(when->injuryMinute < 0)
         event.remove("injuryMinute");
     broadcastEvent(QJsonDocument(event),when->match);
+    dbgReturn();
 }
 
 void PipeServer::table_found(match_time *when){
+    qDebug("Function Entered");
     areStatsFound = true;
     QJsonObject event{
         {"type","Event"},
@@ -64,9 +71,11 @@ void PipeServer::table_found(match_time *when){
         event.remove("injuryMinute");
     lastStatsFound = QJsonDocument(event);
     broadcastEvent(lastStatsFound, when->match);
+    dbgReturn();
 }
 
 void PipeServer::teamsChanged(Match *match){
+    qDebug("Function Entered");
     QJsonArray homeArr, awayArr;
     for(int i = 0; i < match->home.nPlayers; ++i)
         homeArr.append(QJsonObject{ {"name",match->home.player[i].name}, {"playerId",(qint64)match->home.player[i].ID} });
@@ -94,9 +103,11 @@ void PipeServer::teamsChanged(Match *match){
     };
     lastTeamsChanged = QJsonDocument(event);
     broadcastEvent(lastTeamsChanged, match);
+    dbgReturn();
 }
 
 void PipeServer::broadcastEvent(QJsonDocument event, Match *match, qint64 timestamp){
+    qDebug("Function Entered");
     QFile log(match->applyFilenameFormat(QSettings().value("EventLogFile", "SEN_P-AI_Events.log").toString(),timestamp));
     log.open(QIODevice::ReadWrite | QIODevice::Text | QIODevice::Append);
     log.write(event.toJson());
@@ -110,4 +121,5 @@ void PipeServer::broadcastEvent(QJsonDocument event, Match *match, qint64 timest
             clients.erase(i);
         }
     }
+    dbgReturn();
 }

@@ -25,6 +25,7 @@ public:
 private slots:
     void newMatch(Match *match);
     void doneMatch(QString tabText);
+    void invalidateMatch();
 
     void on_openButton_clicked();
     void on_saveButton_clicked();

@@ -108,6 +108,7 @@ public:
     statsInfo();
 
     static void init(){
+        qDebug("Function Entered");
         statMapping = std::map<QString,PESstat*>();
         for(int s = 0; s < statCount; ++s){
             statMapping.insert({stats[s].name,stats+s});

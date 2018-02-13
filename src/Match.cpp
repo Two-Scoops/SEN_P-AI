@@ -14,6 +14,7 @@
 int Match::darkenRate = 19;
 
 void Match::init(){
+    qDebug("Function Entered");
     ui->homeLabel->setText(home.name);
     ui->awayLabel->setText(away.name);
     ui->statsTable->setColumnCount((int)statsInfo::count());
@@ -34,6 +35,7 @@ void Match::init(){
     view->setStretchLastSection(true);
 
     ui->statsTable->setFocusPolicy(Qt::StrongFocus);
+    dbgReturn(return);
 }
 
 Match::Match(teamInfo homeInfo, teamInfo awayInfo, QWidget *parent) :
@@ -41,17 +43,22 @@ Match::Match(teamInfo homeInfo, teamInfo awayInfo, QWidget *parent) :
     home(homeInfo), away(awayInfo), totalPlayers(homeInfo.nPlayers + awayInfo.nPlayers),
     ui(new Ui::Match)
 {
+    qDebug("Function Entered");
     matchCreationTime = QDateTime::currentMSecsSinceEpoch();
     ui->setupUi(this);
     init();
+    dbgReturn();
 }
 
 Match::Match(): ui(new Ui::Match){
+    qDebug("Function Entered");
     ui->setupUi(this);
+    dbgReturn();
 }
 
 
 void Match::keyPressEvent(QKeyEvent *event){
+    qDebug("Function Entered");
     if(event->matches(QKeySequence::Copy) && ui->statsTable->hasFocus()){
         event->accept();
         QString text;
@@ -76,9 +83,11 @@ void Match::keyPressEvent(QKeyEvent *event){
     } else {
         event->ignore();
     }
+    dbgReturn(return);
 }
 
 void Match::statsDisplayChanged(statsInfo &info){
+    qDebug("Function Entered");
     int minHeight = 0;
     QHeaderView *header = ui->statsTable->horizontalHeader();
     for(int i = 0; i < info.count(); ++i){
@@ -89,6 +98,7 @@ void Match::statsDisplayChanged(statsInfo &info){
         }
     }
     header->setMinimumHeight(minHeight+8);
+    dbgReturn(return);
 }
 
 
@@ -97,6 +107,7 @@ QFontMetrics Match::getFont() const{
 }
 
 void Match::addEvent(match_event event){
+    qDebug("Function Entered");
     events.push_back(event);
     //Tally Scoreline
     if(event.type == goal)
@@ -104,32 +115,39 @@ void Match::addEvent(match_event event){
     else if(event.type == ownGoal)
         (event.isHome ? awayScore : homeScore) += 1;
     logEvent(event);
+    dbgReturn(return);
 }
 void Match::logEvent(match_event &event){
+    qDebug("Function Entered");
     //TODO use actual team colors
     ui->eventLog->setTextBackgroundColor(QColor(event.isHome ? "#e0e0fc" : "#ffe0dd"));
     QString logStr = event.eventLogString();
     if(!logStr.isEmpty())
         ui->eventLog->append(logStr);
+    dbgReturn(return);
 }
 
 QString Match::addStatCell(int r, int c, double val){
+    qDebug("Function Entered");
     QString str = QString::number(val,'g',10);
     QTableWidgetItem *item = new QTableWidgetItem(str);
     //TODO use actual team colors
     item->setBackground(QBrush(QColor(r < home.nPlayers ? "#E5E5FC" : "#FFE9E8")));
     ui->statsTable->setItem(r,c,item);
     getLastValue(r,c) = val;
-    return str;
+    dbgReturn(return str);
 }
 
 void Match::setColumnWidths(std::vector<int> &maxWidths){
+    qDebug("Function Entered");
     for(int s = 0; s < ui->statsTable->columnCount(); ++s){
         ui->statsTable->setColumnWidth(s, std::max(20,maxWidths[s]+8));
     }
+    dbgReturn(return);
 }
 
 void Match::setLabels(int gameMinute, double time, double injuryTime){
+    qDebug("Function Entered");
     ui->hScoreLabel->setText(QString::number(homeScore));
     ui->aScoreLabel->setText(QString::number(awayScore));
     QString minuteString = QString::number(gameMinute);
@@ -140,9 +158,11 @@ void Match::setLabels(int gameMinute, double time, double injuryTime){
     else
         minuteString += ":" + QString("%1").arg((int)(std::fmod(time,1.0) * 60),2,10,QChar('0'));
     ui->clockLabel->setText(minuteString);
+    dbgReturn(return);
 }
 
 void Match::updateTableStat(int p, int s, double val, QString &str, bool changed){
+    qDebug("Function Entered");
     QTableWidgetItem *item = ui->statsTable->item(p,s);
     if(changed){
         latestStats[vectorPosition(p,s)] = val;
@@ -155,6 +175,7 @@ void Match::updateTableStat(int p, int s, double val, QString &str, bool changed
         if(v > 0)
             item->setTextColor(QColor::fromHsv(h, s, std::max(0,v-darkenRate), a));
     }
+    dbgReturn(return);
 }
 
 int Match::getLogScroll(){ return ui->eventLog->verticalScrollBar()->value(); }
@@ -163,6 +184,7 @@ void Match::setLogScroll(int val){ ui->eventLog->verticalScrollBar()->setValue(v
 
 
 void Match::endMatch(int length){
+    qDebug("Function Entered");
     matchLength = length;
     updateTimes.push_back(updateTimes.back());
     updateTimes.back().timestamp = QDateTime::currentMSecsSinceEpoch();
@@ -171,11 +193,14 @@ void Match::endMatch(int length){
             ui->statsTable->item(row,col)->setTextColor(Qt::black);
         }
     }
+    dbgReturn(return);
 }
 
 void Match::showBenched(bool shown){
+    qDebug("Function Entered");
     for(int p = 0; p < totalPlayers; ++p)
         ui->statsTable->setRowHidden(p, !shown && 0 > getLastValue(p,statsInfo::firstMinuteOnPitch));
+    dbgReturn(return);
 }
 
 Match::~Match()
@@ -186,6 +211,7 @@ Match::~Match()
 
 
 QString match_event::eventLogString(){
+    qDebug("Function Entered");
     QString result = QString("%1").arg(when->minuteString(),7);
     switch(type){
     case goal:
@@ -207,12 +233,13 @@ QString match_event::eventLogString(){
         if(player2 >= 0)
             result += "\n         OUT: " + player2Name();
         break;
-    default: return QString();
+    default: dbgReturn(return QString());
     }
-    return result;
+    dbgReturn(return result);
 }
 
 QJsonDocument match_event::toJSON(){
+    qDebug("Function Entered");
     QJsonObject res = when->startEventObject();
     QJsonObject player1Obj{
         {"name",player1Name()},
@@ -284,10 +311,11 @@ QJsonDocument match_event::toJSON(){
     default:
         break;
     }
-    return QJsonDocument(res);
+    dbgReturn(return QJsonDocument(res));
 }
 
 QString match_time::minuteString() const{
+    qDebug("Function Entered");
     double time = gameMinute, injuryTime = injuryMinute;
     QString minuteString = QString::number((int)gameMinute);
     if(std::isnan(injuryTime))
@@ -296,10 +324,11 @@ QString match_time::minuteString() const{
         minuteString += "+" + QString::number((int)injuryTime) + ":" + QString("%1").arg((int)(std::fmod(injuryTime,1.0) * 60),2,10,QChar('0'));
     else
         minuteString += ":" + QString("%1").arg((int)(std::fmod(time,1.0) * 60),2,10,QChar('0'));
-    return minuteString;
+    dbgReturn(return minuteString);
 }
 
 QJsonObject match_time::startEventObject() const{
+    qDebug("Function Entered");
     QJsonObject res{
         {"type", "Event"},
         {"timestamp", timestamp},
@@ -309,7 +338,7 @@ QJsonObject match_time::startEventObject() const{
         res["injuryMinute"] = true;
     else if(injuryMinute >= 0)
         res["injuryMinute"] = injuryMinute;
-    return res;
+    dbgReturn(return res);
 }
 
 
@@ -404,6 +433,7 @@ struct Section {
 template<FileAction act>
 bool Match::file(Match *match, QString filename)
 {
+    qDebug("Function Entered");
     Match &m = *match;
     if(act == save){
         filename = match->applyFilenameFormat(filename,match->matchCreationTime);
@@ -411,7 +441,7 @@ bool Match::file(Match *match, QString filename)
     }
     BinFile<act> f(filename);
 #define setGood f.good = f.good
-#define RET_IF_ERROR(MSG) if(!f.good) return false //;qDebug()<<MSG
+#define RET_IF_ERROR(MSG) if(!f.good) dbgReturn(return false) //;qDebug()<<MSG
     f.open();
     RET_IF_ERROR("File opened\nReading/Writing header");
     auto rwSize = [&](auto& container){
@@ -562,7 +592,7 @@ bool Match::file(Match *match, QString filename)
         match_time &lastTime = m.updateTimes.back();
         m.setLabels((int)lastTime.gameMinute,lastTime.gameMinute,lastTime.injuryMinute);
     }
-    return f.good;
+    dbgReturn(return f.good);
 }
 template bool Match::file<load>(Match *match, QString filename);
 template bool Match::file<save>(Match *match, QString filename);

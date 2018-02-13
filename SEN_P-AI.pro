@@ -11,6 +11,7 @@ TARGET = SEN_P-AI
 TEMPLATE = app
 CONFIG += c++11 static
 
+DEFINES += "QT_MESSAGELOGCONTEXT"
 
 SOURCES +=\
     src/CustomTableStyle.cpp \

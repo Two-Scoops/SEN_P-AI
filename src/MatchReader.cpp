@@ -71,21 +71,26 @@ void MatchReader::showTime(){
 
 void MatchReader::stats_lost()
 {
+    qDebug("Function Entered");
     if(match == nullptr)
         return;
     endMatch();
+    dbgReturn();
 }
 //==========Match Tracking===========
 
 void MatchReader::newMatch(){
+    qDebug("Function Entered");
     if(match != nullptr)
         endMatch();
     match = new Match(Home,Away);
     resetTime();
     emit new_match(match);
+    dbgReturn();
 }
 
 void MatchReader::stats_found(uint8_t *data){
+    qDebug("Function Entered");
     if(match == nullptr){
         newMatch();
     }
@@ -126,10 +131,12 @@ void MatchReader::stats_found(uint8_t *data){
     match->setLabels(lastMinute,lastMinute,-1);
 
     emit table_found_event(when);
+    dbgReturn();
 }
 
 void MatchReader::teams_changed(qint64 timestamp, teamInfo home, teamInfo away)
 {
+    qDebug("Function Entered");
     if(home.name[0] == '\0' || away.name[0] == '\0'){
         match = nullptr;
         return;
@@ -138,16 +145,24 @@ void MatchReader::teams_changed(qint64 timestamp, teamInfo home, teamInfo away)
     newMatch();
     match->matchCreationTime = timestamp;
     server->teamsChanged(match);
+    dbgReturn();
 }
 
 void MatchReader::endMatch(){
-    match->endMatch(matchLength);
-    emit done_match(Home.name + " vs " + Away.name);
-    emit table_lost_event(&match->updateTimes.back());
+    qDebug("Function Entered");
+    if(match->updateTimes.empty()){
+        emit invalidate_match();
+    } else {
+        match->endMatch(matchLength);
+        emit done_match(Home.name + " vs " + Away.name);
+        emit table_lost_event(&match->updateTimes.back());
+    }
     match = nullptr;
+    dbgReturn();
 }
 
 int MatchReader::collectStatChanges(uint8_t *currData, uint8_t *prevData, std::vector<stat_change>& changes, match_time *when){
+    qDebug("Function Entered");
 
     QFontMetrics fm = match->getFont();
     std::vector<int> maxWidths = std::vector<int>((int)statsInfo::count(),0);
@@ -194,10 +209,11 @@ int MatchReader::collectStatChanges(uint8_t *currData, uint8_t *prevData, std::v
 
     match->setColumnWidths(maxWidths);
 
-    return segment;
+    dbgReturn(return segment);
 }
 
 eventType MatchReader::proccessStatEvents(std::vector<match_event>& eventsThisUpdate, const std::vector<stat_change>& changes, match_time *when){
+    qDebug("Function Entered");
     //Search through the changed stats to record important events
     enum rState {
         unknown, shot, missedShot, savedShot, goalScored, ownGoalScored, foul, offside, pass, inboundPass
@@ -249,18 +265,19 @@ eventType MatchReader::proccessStatEvents(std::vector<match_event>& eventsThisUp
     default:
     case unknownHalf:
     case shot:
-    case inboundPass:   return eventType::unknown;
-    case missedShot:    return eventType::goalkick;
-    case savedShot:     return eventType::cornerkick;
-    case goalScored:    return eventType::goal;
-    case ownGoalScored: return eventType::ownGoal;
-    case foul:          return eventType::foul;
-    case offside:       return eventType::offside;
-    //case pass:          return eventType::throwin;
+    case inboundPass:   dbgReturn(return eventType::unknown);
+    case missedShot:    dbgReturn(return eventType::goalkick);
+    case savedShot:     dbgReturn(return eventType::cornerkick);
+    case goalScored:    dbgReturn(return eventType::goal);
+    case ownGoalScored: dbgReturn(return eventType::ownGoal);
+    case foul:          dbgReturn(return eventType::foul);
+    case offside:       dbgReturn(return eventType::offside);
+    //case pass:          dbgReturn(return eventType::throwin);
     }
 }
 
 void MatchReader::calcUpdateTime(match_time *when, int segment){
+    qDebug("Function Entered");
     {
         //Calculate the mean average of the "Last Minute on Pitch" stat to eliminate inaccuracies caused by subbing (thanks PES)
         std::unordered_map<int,int> minuteCount;
@@ -351,10 +368,12 @@ void MatchReader::calcUpdateTime(match_time *when, int segment){
     //Update the match time
     when->gameMinute = (float)time;
     when->injuryMinute = injuryTime;
+    dbgReturn(return);
 }
 
 
 void MatchReader::update(uint8_t *currData, uint8_t *prevData){
+    qDebug("Function Entered");
     match_time *when = match->addUpdateTime(lastMinute,tickLastUpdate);
 
     //==================Collect Stat Changes====================//
@@ -420,4 +439,5 @@ void MatchReader::update(uint8_t *currData, uint8_t *prevData){
     for(match_event &event : eventsThisUpdate){
         emit newEvent(event);
     }
+    dbgReturn(return);
 }

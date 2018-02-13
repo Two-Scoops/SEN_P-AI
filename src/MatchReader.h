@@ -27,6 +27,7 @@ public:
 signals:
     void new_match(Match *match);
     void done_match(QString tabtext);
+    void invalidate_match();
 
     void clock_stopped(quint64 timestamp, quint32 gameTick, float gameMinute, float injuryMinute);
     void clock_started(quint64 timestamp, quint32 gameTick, float gameMinute, float injuryMinute);

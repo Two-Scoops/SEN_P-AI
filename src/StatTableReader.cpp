@@ -8,6 +8,7 @@
 #include <Windows.h>
 #include <tlhelp32.h>
 #include <QDebug>
+#include "Common.h"
 
 #define STAT_MEM_STATE MEM_COMMIT
 #define STAT_MEM_TYPE MEM_PRIVATE
@@ -22,11 +23,14 @@
 #define isSameTeam(A,B) (teamIdOf(A) == teamIdOf(B))
 
 #define MAX_PLAYERS 32
-static uint8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t) {
+static int8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t) {
+    qDebug("Function Entered");
     uint32_t playerID = 0;
     uint32_t maybeID = 0;
     int entries = 0;
-    while (ReadProcessMemory(PES, (void*)addr, &maybeID, 4, NULL) && entries <= MAX_PLAYERS) {
+    while (entries <= MAX_PLAYERS) {
+        if(!ReadProcessMemory(PES, (void*)addr, &maybeID, 4, NULL))
+            dbgReturn(return -1);
         //printf("Testing value: %d\n", maybeID);
         if(!isPlayerId(maybeID))
             break;
@@ -37,7 +41,7 @@ static uint8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t) {
         entries++;
         addr += STAT_ENTRY_SIZE;
     }
-    return entries;
+    dbgReturn(return entries);
 }
 
 
@@ -50,12 +54,14 @@ static uint8_t countTableEntries(HANDLE PES, uintptr_t addr, uint32_t) {
 #define TEAM_HOME_PLAYER_OFFSET (TEAM_MEM_OFFSET + 0x0F8)
 #define TEAM_AWAY_PLAYER_OFFSET (TEAM_MEM_OFFSET + 0x618)
 
-static uint8_t countTeamPlayerEntries(HANDLE PES, uintptr_t base_addr){
+static int8_t countTeamPlayerEntries(HANDLE PES, uintptr_t base_addr){
+    qDebug("Function Entered");
     uint8_t count = 0;
     uint32_t homePlayers[66] = {0};
     uint32_t awayPlayers[66] = {0};
-    int homeRead = ReadProcessMemory(PES, (void*)(base_addr + TEAM_HOME_PLAYER_OFFSET), homePlayers, 264, NULL);
-    int awayRead = ReadProcessMemory(PES, (void*)(base_addr + TEAM_AWAY_PLAYER_OFFSET), awayPlayers, 264, NULL);
+    int homeRead, awayRead;
+    if(!(homeRead = ReadProcessMemory(PES, (void*)(base_addr + TEAM_HOME_PLAYER_OFFSET), homePlayers, 264, NULL))) return -1;
+    if(!(awayRead = ReadProcessMemory(PES, (void*)(base_addr + TEAM_AWAY_PLAYER_OFFSET), awayPlayers, 264, NULL))) return -1;
     if(homeRead && awayRead){
         for(int i = 0; i < 32; ++i){
             if((homePlayers[i*2] & 0xFFFF) == 0xFFFD && teamIdOf(homePlayers[i*2 + 1]) == homePlayers[65])
@@ -66,10 +72,11 @@ static uint8_t countTeamPlayerEntries(HANDLE PES, uintptr_t base_addr){
                 count++;
         }
     }
-    return count;
+    dbgReturn(return count);
 }
 
 bool StatTableReader::updateProcess(){
+    qDebug("Function Entered");
     //Check if process is still opened
     DWORD exitCode = 0;
     if (GetExitCodeProcess(processHandle, &exitCode)) {
@@ -80,17 +87,18 @@ bool StatTableReader::updateProcess(){
             basePtr = homePtr = awayPtr = teamDataPtr = nullptr;
             emit status_changed(QStringLiteral("SEN:P-AI noticed %1 close").arg(QString::fromWCharArray(proccessName)));
             emit table_lost();
-            return false;
+            dbgReturn(return false);
         } else {
-            return true;
+            dbgReturn(return true);
         }
     } else {
         emit status_changed(QStringLiteral("SEN:P-AI does not have access to Exit Code"));
-        return false;
+        dbgReturn(return false);
     }
 }
 
 bool StatTableReader::findProcess(){
+    qDebug("Function Entered");
     emit action_changed(QStringLiteral("Searching for %1...").arg(QString::fromWCharArray(proccessName)));
     //Try to find process by name
     DWORD pesID = 0;
@@ -119,17 +127,18 @@ bool StatTableReader::findProcess(){
         processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,FALSE,pesID);
         if (processHandle == NULL) {
             emit status_changed(QStringLiteral("SEN:P-AI failed to open %1 with debug access\n").arg(QString::fromWCharArray(proccessName)));
-            return false;
+            dbgReturn(return false);
         } else {
             emit status_changed(QStringLiteral("SEN:P-AI noticed %1!").arg(QString::fromWCharArray(proccessName)));
-            return true;
+            dbgReturn(return true);
         }
     } else {//no process was found
-        return false;
+        dbgReturn(return false);
     }
 }
 
 bool StatTableReader::updateTeams(){
+    qDebug("Function Entered");
     emit action_changed(QStringLiteral("Updating data"));
     if(ReadProcessMemory(processHandle, teamDataPtr, prevTeamData, sizeof(teamDataTable), NULL)){ //Team Data read succeeds
         std::swap(currTeamData,prevTeamData);
@@ -169,16 +178,17 @@ bool StatTableReader::updateTeams(){
         }//End If/Else either team has/hasn't changed
 
         //TODO insert some team data shit here
-        return true;
+        dbgReturn(return true);
     } else { //Team data read fails
         teamDataPtr = nullptr;
         emit status_changed(QStringLiteral("SEN:P-AI lost track of teams"));
         emit teamData_lost();
-        return false;
+        dbgReturn(return false);
     }
 }
 
 bool StatTableReader::findTeams(){
+    qDebug("Function Entered");
     emit action_changed(QStringLiteral("Searching for Team Data table..."));
     MEMORY_BASIC_INFORMATION info;
 
@@ -189,12 +199,15 @@ bool StatTableReader::findTeams(){
         //If the properties of the memory block match what we're looking for
         if ((info.State & TEAM_MEM_STATE) && (info.Type & TEAM_MEM_TYPE) && (info.Protect & TEAM_MEM_PROTEC) && (info.RegionSize == TEAM_MEM_SIZE)) {
             //Check set memory offsets in the block and count how many Player IDs are found
-            uint8_t playerCount = countTeamPlayerEntries(processHandle, mappingAddr);
+            int8_t playerCount = countTeamPlayerEntries(processHandle, mappingAddr);
+            if(playerCount < 0)
+                dbgReturn(return false);
             //If there are enough players to make two valid teams
             if(playerCount >= 22){
                 teamDataPtr = (teamDataTable*)(mappingAddr + TEAM_MEM_OFFSET);
                 //Do an initial read of the team data
-                ReadProcessMemory(processHandle, teamDataPtr, currTeamData, sizeof(teamDataTable), NULL);
+                if(0 >= ReadProcessMemory(processHandle, teamDataPtr, currTeamData, sizeof(teamDataTable), NULL))
+                    dbgReturn(return false);
                 teamInfo home, away;
                 home.name = QString::fromUtf8(currTeamData->homeData.teamName);
                 _homeID = home.ID = currTeamData->homeData.teamID;
@@ -216,17 +229,18 @@ bool StatTableReader::findTeams(){
                 }
                 emit status_changed(QStringLiteral("SEN:P-AI noticed the teams!"));
                 emit teamsChanged(QDateTime::currentMSecsSinceEpoch(),home,away);
-                return true;
+                dbgReturn(return true);
             } //End if enough valid players
         }//End If matching memory block
     }//End For every memory block in the proccess
-    return false;
+    dbgReturn(return false);
 }
 
 bool StatTableReader::updateStats(){
+    qDebug("Function Entered");
     emit action_changed(QStringLiteral("Updating stats"));
-    int homeRead = ReadProcessMemory(processHandle, homePtr, prevData,                        _nHome*STAT_ENTRY_SIZE, NULL);
-    int awayRead = ReadProcessMemory(processHandle, awayPtr, prevData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+    int awayRead, homeRead = ReadProcessMemory(processHandle, homePtr, prevData,                        _nHome*STAT_ENTRY_SIZE, NULL);
+    if(homeRead)  awayRead = ReadProcessMemory(processHandle, awayPtr, prevData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
     if(homeRead && awayRead){ //Table read succeeds
         bool stillValid = true;
         for(int i = 0; i < _nHome + _nAway && stillValid; ++i){
@@ -235,16 +249,17 @@ bool StatTableReader::updateStats(){
         if(stillValid){
             std::swap(currData,prevData);
             emit statTableUpdate(currData,prevData);
-            return true;
+            dbgReturn(return true);
         }
     } //Table read fails or player ids changed
     basePtr = homePtr = awayPtr = nullptr;
     emit status_changed(QStringLiteral("SEN:P-AI lost track of stats"));
     emit table_lost();
-    return false;
+    dbgReturn(return false);
 }
 
-void StatTableReader::doStatsFound(uint8_t homeCount, uint8_t awayCount){
+bool StatTableReader::doStatsFound(uint8_t homeCount, uint8_t awayCount){
+    qDebug("Function Entered");
     //If the number of valid players on each team is different than it was before, reallocate the player entries array and fix all the pointers
     if(homeCount != _nHome || awayCount != _nAway){
         currData = data = (uint8_t*)realloc(data,(homeCount+awayCount)*STAT_ENTRY_SIZE*2);
@@ -255,13 +270,19 @@ void StatTableReader::doStatsFound(uint8_t homeCount, uint8_t awayCount){
         _nPlayers = homeCount + awayCount;
     }
     //Do an initial update of the stats table
-    ReadProcessMemory(processHandle, homePtr, currData,                        _nHome*STAT_ENTRY_SIZE, NULL);
-    ReadProcessMemory(processHandle, awayPtr, currData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+
+    int awayRead, homeRead = ReadProcessMemory(processHandle, homePtr, currData,                        _nHome*STAT_ENTRY_SIZE, NULL);
+    if(homeRead)  awayRead = ReadProcessMemory(processHandle, awayPtr, currData+_nHome*STAT_ENTRY_SIZE, _nAway*STAT_ENTRY_SIZE, NULL);
+    if(!(homeRead && awayRead))
+        dbgReturn(return false);
     emit status_changed(QStringLiteral("SEN:P-AI noticed the stats!"));
     emit table_found(currData);
+    dbgReturn(return true);
+
 }
 
 bool StatTableReader::findStats(){
+    qDebug("Function Entered");
     emit action_changed(QStringLiteral("Searching for stats table..."));
     MEMORY_BASIC_INFORMATION info;
 
@@ -272,8 +293,10 @@ bool StatTableReader::findStats(){
         //If the properties of the memory block match what we're looking for
         if ((info.State & STAT_MEM_STATE) && (info.Type & STAT_MEM_TYPE) && (info.Protect & STAT_MEM_PROTEC) && (info.RegionSize == STAT_MEM_SIZE)) {
             //Check set memory offsets in the block and count how many Player IDs are found
-            uint8_t homeCount = countTableEntries(processHandle,(mappingAddr+HOME_OFFSET),_homeID);
-            uint8_t awayCount = countTableEntries(processHandle,(mappingAddr+AWAY_OFFSET),_awayID);
+            int8_t homeCount = countTableEntries(processHandle,(mappingAddr+HOME_OFFSET),_homeID);
+            if(homeCount < 0) dbgReturn(return false);
+            int8_t awayCount = countTableEntries(processHandle,(mappingAddr+AWAY_OFFSET),_awayID);
+            if(awayCount < 0) dbgReturn(return false);
 
             //If there are enough players to make two valid teams
             if (homeCount >= 11 && awayCount >= 11) {
@@ -281,26 +304,19 @@ bool StatTableReader::findStats(){
                 basePtr = (uint8_t*) mappingAddr;
                 homePtr = (uint8_t*)(mappingAddr+HOME_OFFSET);
                 awayPtr = (uint8_t*)(mappingAddr+AWAY_OFFSET);
-                doStatsFound(homeCount, awayCount);
-                return true;
+
+                dbgReturn(return doStatsFound(homeCount, awayCount));
             }//End If enough valid players
         }//End If matching memory block
     }//End For every memory block in the proccess
-    return false;
+    dbgReturn(return false);
 }
 
-void StatTableReader::tryReadBlock(uintptr_t src, uint8_t *dest, size_t size){
-    if(!ReadProcessMemory(processHandle,(void*)src,dest,size, NULL)){
-        if(size == 1) *dest = 0;
-        if(size <= 0) return;
-        size_t half = size/2;
-        tryReadBlock(src,dest,half);
-        tryReadBlock(src+half,dest+half,size-half);
-    }
-}
+
 
 #include "emmintrin.h"
 bool StatTableReader::bruteForceStats(){
+    qDebug("Function Entered");
     MEMORY_BASIC_INFORMATION info;
 #define AWAY_DIFF 0x28E30
 
@@ -317,7 +333,7 @@ bool StatTableReader::bruteForceStats(){
                 searchSpace = (uint32_t*)_mm_malloc((searchSize = (uint32_t)regionSize),16);
                 if(searchSpace == nullptr){
                     qDebug() << "Allocation failed";
-                    return false;
+                    dbgReturn(return false);
                 }
             }
 //            tryReadBlock(mappingAddr,(uint8_t*)searchSpace,regionSize);
@@ -338,25 +354,28 @@ bool StatTableReader::bruteForceStats(){
                     uintptr_t awayAddr = homeAddr + AWAY_DIFF;
 
                     uint8_t homeCount = countTableEntries(processHandle,homeAddr,_homeID);
+                    if(homeCount < 0) dbgReturn(return false);
                     uint8_t awayCount = countTableEntries(processHandle,awayAddr,_awayID);
+                    if(awayCount < 0) dbgReturn(return false);
                     //If there are enough players to make two valid teams
                     if (homeCount >= 11 && awayCount >= 11) {
                         //Set target proccess pointers
                         basePtr = (uint8_t*) mappingAddr;
                         homePtr = (uint8_t*) homeAddr;
                         awayPtr = (uint8_t*) awayAddr;
-                        doStatsFound(homeCount, awayCount);
-                        return true;
+
+                        dbgReturn(return doStatsFound(homeCount, awayCount));
                     }//End If enough valid players
                 }//End If any elements matched
             }//End for every 128bit vector
         }//End If matching memory block
     }//End For every memory block in the proccess
-    return false;
+    dbgReturn(return false);
 }
 
 
 void StatTableReader::update(){
+    qDebug("Function Entered");
     switch (status) {
     default:
     case None:
@@ -379,11 +398,13 @@ void StatTableReader::update(){
         break;
     }
     butt->setEnabled(status == Teams);
+    dbgReturn();
 }
 
 
 int StatTableReader::GetDebugPrivilege()
 {
+    qDebug("Function Entered");
     HANDLE hProcess=GetCurrentProcess();
     HANDLE hToken;
 
@@ -413,5 +434,5 @@ int StatTableReader::GetDebugPrivilege()
     }
 
     CloseHandle(hToken);
-    return bRet;
+    dbgReturn(return bRet);
 }

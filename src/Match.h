@@ -76,10 +76,12 @@ class Match : public QWidget
     friend class MatchReader;
     QFontMetrics getFont() const;
     match_time* addUpdateTime(float gameMinute = -1.0f, int gameTick = 0, float injuryTime = -1.0f){
+        qDebug("Function Entered");
         updateTimes.push_back(match_time{this,QDateTime::currentMSecsSinceEpoch(),gameMinute,injuryTime,gameTick});
         return &updateTimes.back();
     }
     void addEvent(const match_time *when, eventType type, int8_t p1, int8_t p2 = -1, eventType reason = unknown){
+        qDebug("Function Entered");
         addEvent(match_event{when,p1,p2,type,reason, p1 < home.nPlayers});
     }
     void addEvent(match_event event);
@@ -126,6 +128,7 @@ public:
     qint64 timestamp() const{ return matchCreationTime; }
 
     QString applyFilenameFormat(QString qstr, qint64 timestamp){
+        qDebug("Function Entered");
         QString homename = home.name, awayname = away.name;
         qstr.replace("%HOME",homename.remove(QRegExp("[^\\w@]")));
         qstr.replace("%AWAY",awayname.remove(QRegExp("[^\\w@]")));
