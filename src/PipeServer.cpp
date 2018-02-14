@@ -109,9 +109,10 @@ void PipeServer::teamsChanged(Match *match){
 void PipeServer::broadcastEvent(QJsonDocument event, Match *match, qint64 timestamp){
     qDebug("Function Entered");
     QFile log(match->applyFilenameFormat(QSettings().value("EventLogFile", "SEN_P-AI_Events.log").toString(),timestamp));
-    log.open(QIODevice::ReadWrite | QIODevice::Text | QIODevice::Append);
-    log.write(event.toJson());
-    log.close();
+    if(log.open(QIODevice::ReadWrite | QIODevice::Text | QIODevice::Append)){
+        log.write(event.toJson());
+        log.close();
+    }
     for(int i = 0; i < clients.size(); ++i){
         if(clients[i]->valid())
             clients[i]->sendEvent(event);
