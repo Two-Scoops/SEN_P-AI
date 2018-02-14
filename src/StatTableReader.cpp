@@ -200,14 +200,12 @@ bool StatTableReader::findTeams(){
         if ((info.State & TEAM_MEM_STATE) && (info.Type & TEAM_MEM_TYPE) && (info.Protect & TEAM_MEM_PROTEC) && (info.RegionSize == TEAM_MEM_SIZE)) {
             //Check set memory offsets in the block and count how many Player IDs are found
             int8_t playerCount = countTeamPlayerEntries(processHandle, mappingAddr);
-            if(playerCount < 0)
-                dbgReturn(return false);
             //If there are enough players to make two valid teams
             if(playerCount >= 22){
                 teamDataPtr = (teamDataTable*)(mappingAddr + TEAM_MEM_OFFSET);
                 //Do an initial read of the team data
                 if(0 >= ReadProcessMemory(processHandle, teamDataPtr, currTeamData, sizeof(teamDataTable), NULL))
-                    dbgReturn(return false);
+                    ;//dbgReturn(return false);
                 teamInfo home, away;
                 home.name = QString::fromUtf8(currTeamData->homeData.teamName);
                 _homeID = home.ID = currTeamData->homeData.teamID;
@@ -294,9 +292,7 @@ bool StatTableReader::findStats(){
         if ((info.State & STAT_MEM_STATE) && (info.Type & STAT_MEM_TYPE) && (info.Protect & STAT_MEM_PROTEC) && (info.RegionSize == STAT_MEM_SIZE)) {
             //Check set memory offsets in the block and count how many Player IDs are found
             int8_t homeCount = countTableEntries(processHandle,(mappingAddr+HOME_OFFSET),_homeID);
-            if(homeCount < 0) dbgReturn(return false);
             int8_t awayCount = countTableEntries(processHandle,(mappingAddr+AWAY_OFFSET),_awayID);
-            if(awayCount < 0) dbgReturn(return false);
 
             //If there are enough players to make two valid teams
             if (homeCount >= 11 && awayCount >= 11) {
@@ -354,9 +350,7 @@ bool StatTableReader::bruteForceStats(){
                     uintptr_t awayAddr = homeAddr + AWAY_DIFF;
 
                     uint8_t homeCount = countTableEntries(processHandle,homeAddr,_homeID);
-                    if(homeCount < 0) dbgReturn(return false);
                     uint8_t awayCount = countTableEntries(processHandle,awayAddr,_awayID);
-                    if(awayCount < 0) dbgReturn(return false);
                     //If there are enough players to make two valid teams
                     if (homeCount >= 11 && awayCount >= 11) {
                         //Set target proccess pointers
