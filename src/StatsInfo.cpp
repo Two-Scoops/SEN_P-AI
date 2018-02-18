@@ -138,7 +138,7 @@ PESstat stats_arr[STAT_COUNT] = {
     {115, 0x0FE9, sint8 ,1,  L("Last Minute on Pitch"),  Normal},
     {116, 0x0FEA, uint8 ,1,  L("?UNKNOWN 116"),      Unknown},
     {117, 0x0FEB, uint8 ,1,  L("?UNKNOWN 117"),      Unknown},
-    {118, 0x0FEC, uint8 ,1,  L("Played Flag"),       DontCare}, //0 = Starting, 1 = Subbed on, 5 = Never Played
+    {118, 0x0FEC, uint8 ,1,  L("?UNKNOWN 118"),      Unknown},
     {119, 0x0FED, uint8 ,1,  L("?UNKNOWN 119"),      Unknown},
     {120, 0x0FEE, uint8 ,1,  L("?UNKNOWN 120"),      Unknown},
     {121, 0x0FEF, uint8 ,1,  L("?UNKNOWN 121"),      Unknown},

@@ -20,7 +20,7 @@ void PipeServer::newConnection(){
         PipeClient *client = new PipeClient(server->nextPendingConnection(),this);
         if(!lastTeamsChanged.isEmpty()){
             client->sendEvent(lastTeamsChanged);
-            if(!lastStatsFound.isEmpty())
+            if(areStatsFound)
                 client->sendEvent(lastStatsFound);
         }
         clients.push_back(client);

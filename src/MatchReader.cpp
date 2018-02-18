@@ -279,7 +279,7 @@ eventType MatchReader::proccessStatEvents(std::vector<match_event>& eventsThisUp
 void MatchReader::calcUpdateTime(match_time *when, int segment){
     qDebug("Function Entered");
     {
-        //Calculate the mean average of the "Last Minute on Pitch" stat to eliminate inaccuracies caused by subbing (thanks PES)
+        //Calculate the mode average of the "Last Minute on Pitch" stat to eliminate inaccuracies caused by subbing (thanks PES)
         std::unordered_map<int,int> minuteCount;
         for(int p = 0; p < match->totalPlayers; ++p){
             minuteCount[(int)match->getLastValue(p, si[lmin_s])]++;
