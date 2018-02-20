@@ -28,7 +28,8 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
     QByteArray localMsg = msg.toLocal8Bit();
     std::fprintf(dbg,"%s: %-18s(line%4u of %.*s)\n", msgType, localMsg.constData(), context.line, fnNameLen,fnName+1);
     std::fflush(dbg);
-    defaultHandler(type,context,msg);
+    if(type != QtDebugMsg || std::strncmp(localMsg.constData(),"Function ",9) != 0)
+        defaultHandler(type,context,msg);
 }
 
 int main(int argc, char *argv[])
