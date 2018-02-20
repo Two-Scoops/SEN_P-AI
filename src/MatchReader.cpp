@@ -181,7 +181,7 @@ int MatchReader::collectStatChanges(uint8_t *currData, uint8_t *prevData, std::v
             double prev = stat.getValue(prevPlayer);
 
             //update text width
-            QString str = QString::number(curr,'g',10);
+            QString str = QString::number(curr,'f',4);
             maxWidths[s] = std::max(maxWidths[s], fm.width(str));
 
             //Update the Table item

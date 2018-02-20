@@ -125,7 +125,7 @@ void Match::logEvent(match_event &event){
 }
 
 QString Match::addStatCell(int r, int c, double val){
-    QString str = QString::number(val,'g',10);
+    QString str = QString::number(val,'f',4);
     QTableWidgetItem *item = new QTableWidgetItem(str);
     //TODO use actual team colors
     item->setBackground(QBrush(QColor(r < home.nPlayers ? "#E5E5FC" : "#FFE9E8")));
