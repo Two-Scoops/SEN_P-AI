@@ -3,7 +3,7 @@
 //Version
 #define MAJOR 1
 #define MINOR 2
-#define PATCH 4
+#define PATCH 5
 
 #include "Match.h"
 #include "PipeServer.h"
