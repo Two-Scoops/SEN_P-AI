@@ -145,6 +145,13 @@ void Match::setColumnWidths(std::vector<int> &maxWidths){
 void Match::setLabels(int gameMinute, double time, double injuryTime){
     ui->hScoreLabel->setText(QString::number(homeScore));
     ui->aScoreLabel->setText(QString::number(awayScore));
+    if(time == -2){
+        ui->clockLabel->setText("BENULDIES");
+        return;
+    }else if(time < 0){
+        ui->clockLabel->setText("Unknown");
+        return;
+    }
     QString minuteString = QString::number(gameMinute);
     if(std::isnan(injuryTime))
         minuteString += "+";
@@ -304,6 +311,10 @@ QJsonDocument match_event::toJSON(){
 
 QString match_time::minuteString() const{
     double time = gameMinute, injuryTime = injuryMinute;
+    if(time == -2)
+        return QString("BENULDIES");
+    if(time < 0)
+        return QString("(unknown)");
     QString minuteString = QString::number((int)gameMinute);
     if(std::isnan(injuryTime))
         minuteString += "+";
@@ -525,7 +536,7 @@ bool Match::file(Match *match, QString filename)
     std::unordered_map<const match_time*,uint32_t> ptr2idx;
     rwSize(m.updateTimes);
     forAllIn(m.updateTimes,[&](match_time &t, uint32_t i){
-        t.match = &m;
+        if(act == load) t.match = &m;
         f.data(t.timestamp);
         f.data(t.gameTick);
         f.data(t.gameMinute);

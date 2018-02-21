@@ -63,7 +63,7 @@ private:
 
     //================Time-keeping==================//
     enum gameHalf {
-        unknownHalf =-1, firstHalf, firstHalfInjury, secondHalf, secondHalfInjury, firstET, firstETInjury, secondET, secondETInjury
+        unknownHalf =-1, firstHalf, firstHalfInjury, secondHalf, secondHalfInjury, firstET, firstETInjury, secondET, secondETInjury, penalties
     } currentHalf;
     int halfTimeTick, extraTimeTick, extraHalfTimeTick;
     int tickLastUpdate, tickLastStopped, lastMinute;

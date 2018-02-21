@@ -145,7 +145,7 @@ PESstat stats_arr[STAT_COUNT] = {
     {122, 0x0FE0, uint32,1,  L("?UNKNOWN 122"),      Unknown},
     {123, 0x0FF4, uint32,1,  L("Current Playing Position"), Normal},
     {124, 0x0FF8, uint32,13, L("Game Ticks Played"), DontCare}, //There are roughly 48 game ticks per realtime second, with Match Length set to 10 minutes there are 320 ticks per game minute, will vary due to stoppage time
-    {125, 0x102C, uint32,1,  L("?UNKNOWN 137"),      Unknown}, //Related to player rating, when 0, player rating is also 0
+    {125, 0x102C, uint32,1,  L("?UNKNOWN 137"),      Unknown}, //Actually appears to be 4 different 8-bit values
     {126, 0x1030, float32,1, L("Player Rating"),     Normal},
     {127, 0x1034, uint32,140,L("Play Area Grid"),    DontCare},
     {128, 0x1264, uint32,1,  L("Realtime (sec) on Pitch"), Normal},

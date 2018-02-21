@@ -263,7 +263,7 @@ eventType MatchReader::proccessStatEvents(std::vector<match_event>& eventsThisUp
 
     switch (reasonState) {
     default:
-    case unknownHalf:
+    case unknown:
     case shot:
     case inboundPass:   dbgReturn(return eventType::unknown);
     case missedShot:    dbgReturn(return eventType::goalkick);
@@ -312,8 +312,9 @@ void MatchReader::calcUpdateTime(match_time *when, int segment){
     }else{
         switch (currentHalf) {
         case  firstHalfInjury: if(     halfTimeTick < 0 && segment >= 3){      halfTimeTick = tickLastStopped; currentHalf = secondHalf; } break;
-        case secondHalfInjury: if(    extraTimeTick < 0 && segment >= 6){     extraTimeTick = tickLastStopped; currentHalf = firstET; } break;
-        case    firstETInjury: if(extraHalfTimeTick < 0 && segment >= 7){ extraHalfTimeTick = tickLastStopped; currentHalf = secondET; } break;
+        case secondHalfInjury: if(    extraTimeTick < 0 && segment == 6){     extraTimeTick = tickLastStopped; currentHalf = firstET; } break;
+        case    firstETInjury: if(extraHalfTimeTick < 0 && segment == 7){ extraHalfTimeTick = tickLastStopped; currentHalf = secondET; } break;
+        case   secondETInjury: if(                         segment == 8){                                      currentHalf = penalties; } break;
             //TODO figure out if the second ET half starts on segment 7 or in the middle of it
         default: break;
         }
@@ -361,6 +362,7 @@ void MatchReader::calcUpdateTime(match_time *when, int segment){
     case secondHalfInjury: time =  90; injuryTime = CALC_INJURY_TIME(45,     halfTimeTick, > 0); break;
     case    firstETInjury: time = 105; injuryTime = CALC_INJURY_TIME(15,    extraTimeTick, > 0); break;
     case   secondETInjury: time = 120; injuryTime = CALC_INJURY_TIME(15,extraHalfTimeTick, > 0); break;
+    case        penalties: time = -2; injuryTime = NAN;
     default: break;
     }
     matchLength = std::nearbyint(ticksPerMinute/32);
