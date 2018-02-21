@@ -68,7 +68,7 @@ void statSelectionDialog::on_showHiddenStats_toggled(bool checked)
     }
 }
 
-void statSelectionDialog::on_buttonBox_accepted()
+void statSelectionDialog::on_statSelectionDialog_accepted()
 {
     QList<QVariant> visualIndicies;
     QList<QVariant> isShown;
@@ -82,4 +82,5 @@ void statSelectionDialog::on_buttonBox_accepted()
     QSettings settings;
     settings.setValue("StatDisplayOrder",visualIndicies);
     settings.setValue("StatIsShown",isShown);
+
 }

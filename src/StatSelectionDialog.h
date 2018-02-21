@@ -19,7 +19,7 @@ public:
 private slots:
     void on_showHiddenStats_toggled(bool checked);
 
-    void on_buttonBox_accepted();
+    void on_statSelectionDialog_accepted();
 
 private:
     Ui::statSelectionDialog *ui;
