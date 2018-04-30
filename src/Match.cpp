@@ -62,23 +62,26 @@ void Match::keyPressEvent(QKeyEvent *event){
     if(event->matches(QKeySequence::Copy) && ui->statsTable->hasFocus()){
         event->accept();
         QString text;
-        QModelIndexList selected = ui->statsTable->selectionModel()->selectedIndexes();
-        if(selected.empty())
-            return;
-        int row = selected[0].row(), col = selected[0].column();
-        for(QModelIndex &index: selected){
-            const int nrow = index.row(), ncol = index.column();
-            if(ui->statsTable->isRowHidden(nrow) || ui->statsTable->isColumnHidden(ncol))
-                continue;
-            if(row != nrow)
-                text += "\n";
-            else if(col != ncol)
-                text += "\t";
-            row = nrow;
-            col = ncol;
-            text += index.data().toString();
-        }
 
+        struct col{ int logical, visual; };
+        std::vector<col> cols;
+        auto table = ui->statsTable;
+        for(int x = 0; x < table->columnCount(); ++x)
+            if(!table->isColumnHidden(x) && table->selectionModel()->columnIntersectsSelection(x,table->rootIndex()))
+                cols.push_back(col{x,table->visualColumn(x)});
+        if(cols.empty())
+            return;
+        std::sort(cols.begin(),cols.end(),[&](col a, col b){ return a.visual < b.visual; });
+        for(int y = 0; y < ui->statsTable->rowCount(); ++y){
+            if(ui->statsTable->isRowHidden(y) || !table->selectionModel()->rowIntersectsSelection(y,table->rootIndex()))
+                continue;
+            std::vector<QTableWidgetItem*> items;
+            for(col x : cols) items.push_back(ui->statsTable->item(y,x.logical));
+            for(auto item: items) text += item->text() + "\t";
+            text.chop(1);
+            text += "\n";
+        }
+        text.chop(1);
         QApplication::clipboard()->setText(text);
     } else {
         event->ignore();
