@@ -63,17 +63,18 @@ private:
 
     //================Time-keeping==================//
     enum gameHalf {
-        unknownHalf =-1, firstHalf, firstHalfInjury, secondHalf, secondHalfInjury, firstET, firstETInjury, secondET, secondETInjury, penalties
+        Injury = 1,
+        unknownHalf =-2, firstHalf = 0, firstHalfInjury = 1, secondHalf = 2, secondHalfInjury = 3, firstET = 4, firstETInjury = 5, secondET = 6, secondETInjury= 7, penalties = 8
     } currentHalf;
     int halfTimeTick, extraTimeTick, extraHalfTimeTick;
-    int tickLastUpdate, tickLastStopped, lastMinute;
+    int tickLastUpdate, tickLastStopped, lastMinute, lastInjuryMinute;
     int minuteTicks[121];
     int thisMatchLength;
     eventType lastStopReason;
     int matchLength = 10; //In (realtime) minutes (as specified in the match settings)
     void resetTime(){
         currentHalf = firstHalf;
-        halfTimeTick = extraTimeTick = extraHalfTimeTick = -1;
+        halfTimeTick = extraTimeTick = extraHalfTimeTick = lastInjuryMinute = -1;
         tickLastUpdate =  tickLastStopped = lastMinute = thisMatchLength = 0;
         lastStopReason = eventType::unknown;
         for(int &i: minuteTicks)
@@ -93,7 +94,7 @@ private:
 
     eventType proccessStatEvents(std::vector<match_event> &eventsThisUpdate, const std::vector<stat_change> &changes, match_time *when);
     int collectStatChanges(uint8_t *currData, uint8_t *prevData, std::vector<stat_change> &changes, match_time *when);
-    void calcUpdateTime(match_time *when, int segment);
+    bool calcUpdateTime(match_time *when, int segment);
     void newMatch();
 };
 

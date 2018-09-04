@@ -306,6 +306,9 @@ QJsonDocument match_event::toJSON(){
             res["reason"] = "Unknown"; break;
         }
         break;
+    case clockUpdated:
+        res["event"] = "Clock Updated";
+        break;
     default:
         break;
     }

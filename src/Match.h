@@ -37,7 +37,7 @@ struct stat_change {
 
 enum eventType: char {
     unknown = -1, goal = 0, ownGoal, yellowCard, redCard, subOn,
-    teamsChanged, statsFound, statsLost, clockStopped, clockStarted,
+    teamsChanged, statsFound, statsLost, clockStopped, clockStarted, clockUpdated,
     //clockStopped reasons:
     foul, offside, goalkick, cornerkick, throwin, halfend
 };

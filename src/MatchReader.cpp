@@ -276,7 +276,7 @@ eventType MatchReader::proccessStatEvents(std::vector<match_event>& eventsThisUp
     }
 }
 
-void MatchReader::calcUpdateTime(match_time *when, int segment){
+bool MatchReader::calcUpdateTime(match_time *when, int segment){
     qDebug("Function Entered");
     {
         //Calculate the mode average of the "Last Minute on Pitch" stat to eliminate inaccuracies caused by subbing (thanks PES)
@@ -292,7 +292,6 @@ void MatchReader::calcUpdateTime(match_time *when, int segment){
 
     //Calculate the current state of the match clock
     int gameMinute = (int)when->gameMinute, gameTick = when->gameTick;
-    //bool minuteChanged = gameMinute-1 == lastMinute;
 
 
     //Figure out what half we're in
@@ -315,11 +314,9 @@ void MatchReader::calcUpdateTime(match_time *when, int segment){
         case secondHalfInjury: if(    extraTimeTick < 0 && segment == 6){     extraTimeTick = tickLastStopped; currentHalf = firstET; } break;
         case    firstETInjury: if(extraHalfTimeTick < 0 && segment == 7){ extraHalfTimeTick = tickLastStopped; currentHalf = secondET; } break;
         case   secondETInjury: if(                         segment == 8){                                      currentHalf = penalties; } break;
-            //TODO figure out if the second ET half starts on segment 7 or in the middle of it
         default: break;
         }
     }
-    lastMinute = gameMinute;
 
     //calculate the time
     double ticksPerMinute = matchLength * 32;//320 ticks per gameMinute with match length set to 10 minutes, so [ticks per game minute] = 32 * [match length setting]
@@ -366,11 +363,14 @@ void MatchReader::calcUpdateTime(match_time *when, int segment){
     default: break;
     }
     matchLength = std::nearbyint(ticksPerMinute/32);
+    bool changed = (gameMinute != lastMinute || injuryTime != lastInjuryMinute);
+    lastMinute = gameMinute;
+    lastInjuryMinute = injuryTime;
 
     //Update the match time
     when->gameMinute = (float)time;
     when->injuryMinute = injuryTime;
-    dbgReturn(return);
+    dbgReturn(return changed);
 }
 
 
@@ -387,9 +387,11 @@ void MatchReader::update(uint8_t *currData, uint8_t *prevData){
     eventType stopReason = proccessStatEvents(eventsThisUpdate,changes,when);
 
     //===================Calculate update time=================//
-    calcUpdateTime(when,segment);
+    bool timeChanged = calcUpdateTime(when,segment);
     float time = when->gameMinute, injuryTime = when->injuryMinute;
     int gameMinute = (int)time, gameTick = when->gameTick;
+    if(timeChanged)
+        eventsThisUpdate.push_back(match_event{when,0,0,clockUpdated,clockUpdated,false});
 
 
     //=========================Update UI==========================//
@@ -422,7 +424,8 @@ void MatchReader::update(uint8_t *currData, uint8_t *prevData){
             eventsThisUpdate.push_back(match_event{when,-1,-1,clockStarted,unknown,false});
             match->events.push_back(eventsThisUpdate.back());
             emit clock_started(when->timestamp,gameTick,time,injuryTime);
-        }
+        } else
+            emit clock_updated(when->timestamp,gameTick,time,injuryTime);
         tickLastUpdate = gameTick;
         lastStopReason = stopReason;
     }
